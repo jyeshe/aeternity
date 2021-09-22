@@ -1,0 +1,768 @@
+build:
+  executor: builder_container_otp22
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - run:
+        name: Build
+        command: make test-build
+    - save_cache:
+        key: << pipeline.parameters.build_otp22_cache_key >>
+        paths:
+          - "_build"
+    - save_cache:
+        key: << pipeline.parameters.rebar_cache_key >>
+        paths:
+          - .cache/rebar3
+    - store_rebar3_crashdump
+    - fail_notification
+
+build_otp23:
+  executor: builder_container_otp23
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - run:
+        name: Build
+        command: make test-build
+    - save_cache:
+        key: << pipeline.parameters.build_otp23_cache_key >>
+        paths:
+          - "_build"
+    - save_cache:
+        key: << pipeline.parameters.rebar_cache_key >>
+        paths:
+          - .cache/rebar3
+    - store_rebar3_crashdump
+    - fail_notification
+
+build_nix:
+  executor: builder_container_nix_alpine
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_nix_cache
+    - run:
+        name: Build
+        command: nix-shell -j auto --run "make KIND=test"
+    - save_cache:
+        key: << pipeline.parameters.build_nix_cache_key >>
+        paths:
+          - "_build"
+    - save_cache:
+        key: << pipeline.parameters.rebar_cache_key >>
+        paths:
+          - .cache/rebar3
+    - store_rebar3_crashdump
+    - fail_notification_nix
+
+test_roma:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-roma
+  steps:
+    - test_steps_otp22
+
+test_minerva:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-minerva
+  steps:
+    - test_steps_otp22
+
+test_fortuna:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-fortuna
+  steps:
+    - test_steps_otp22
+
+test_lima:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-lima
+  steps:
+    - test_steps_otp22
+
+test_latest:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-latest
+  steps:
+    - test_steps_otp22
+
+# Sanity check whether the latest aesophia compiler works
+test_latest_with_aesophia_compiler:
+  executor: builder_container_otp22
+  parallelism: 1
+  environment:
+    - MAKE_TARGET: ct-latest-no-aci
+  steps:
+    - test_steps_otp22
+
+test_latest_otp23:
+  executor: builder_container_otp23
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-latest
+  steps:
+    - test_steps_otp23
+
+test_mnesia_leveled:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-mnesia-leveled
+  steps:
+    - test_steps_otp22
+
+test_mnesia_rocksdb:
+  executor: builder_container_otp22
+  parallelism: 3
+  environment:
+    - MAKE_TARGET: ct-mnesia-rocksdb
+  steps:
+    - test_steps_otp22
+
+eunit_roma:
+  executor: builder_container_otp22
+  environment:
+    - MAKE_TARGET: eunit-roma
+  steps:
+    - eunit_steps_otp22
+
+eunit_minerva:
+  executor: builder_container_otp22
+  environment:
+    - MAKE_TARGET: eunit-minerva
+  steps:
+    - eunit_steps_otp22
+
+eunit_fortuna:
+  executor: builder_container_otp22
+  environment:
+    - MAKE_TARGET: eunit-fortuna
+  steps:
+    - eunit_steps_otp22
+
+eunit_lima:
+  executor: builder_container_otp22
+  environment:
+    - MAKE_TARGET: eunit-lima
+  steps:
+    - eunit_steps_otp22
+
+eunit_latest:
+  executor: builder_container_otp22
+  environment:
+    - MAKE_TARGET: eunit-latest
+  steps:
+    - eunit_steps_otp22
+
+aevm_tests:
+  executor: builder_container_otp22
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp22_cache
+    - run:
+        name: AEVM Tests
+        command: |
+          make aevm-test
+    - store_rebar3_crashdump
+    - fail_notification
+
+static_analysis:
+  executor: builder_container_otp22
+  steps:
+    - fixed_checkout
+    - run: make dockerignore-check
+    - restore_rebar_cache
+    - restore_build_otp22_cache
+    - run: make edoc
+    - restore_cache:
+        keys:
+          - dialyzer-otp22-cache-v5-{{ .Branch }}-{{ .Revision }}
+          - dialyzer-otp22-cache-v5-{{ .Branch }}-
+          - dialyzer-otp22-cache-v5-
+    - run:
+        name: Update dialyzer PLT
+        command: make dialyzer-install
+    - save_cache:
+        key: dialyzer-otp22-cache-v5-{{ .Branch }}-{{ .Revision }}
+        paths:
+          - << pipeline.parameters.container_otp22_plt >>
+    - run:
+        name: Run dialyzer
+        no_output_timeout: 20m
+        command: make dialyzer
+    - run:
+        name: Check OTP version (for effective CI caching)
+        # How to retrieve OTP version in installed OTP development system: http://erlang.org/doc/system_principles/versions.html
+        command: test "${OTP_VERSION:?}" = $(cat $(erl -noinput -eval 'io:format("~s", [filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])]), init:stop().'))
+    - store_rebar3_crashdump
+    - fail_notification
+
+static_analysis_otp23:
+  executor: builder_container_otp23
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp23_cache
+    - restore_cache:
+        keys:
+          - dialyzer-otp23-cache-v4-{{ .Branch }}-{{ .Revision }}
+          - dialyzer-otp23-cache-v4-{{ .Branch }}-
+          - dialyzer-otp23-cache-v4-
+    - run:
+        name: Update dialyzer PLT
+        command: make dialyzer-install
+    - save_cache:
+        key: dialyzer-otp23-cache-v4-{{ .Branch }}-{{ .Revision }}
+        paths:
+          - << pipeline.parameters.container_otp23_plt >>
+    - run:
+        name: Run dialyzer
+        no_output_timeout: 20m
+        command: make dialyzer
+    - run:
+        name: Check OTP version (for effective CI caching)
+        # How to retrieve OTP version in installed OTP development system: http://erlang.org/doc/system_principles/versions.html
+        command: test "${OTP_VERSION:?}" = $(cat $(erl -noinput -eval 'io:format("~s", [filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])]), init:stop().'))
+    - store_rebar3_crashdump
+    - fail_notification
+
+rebar_lock_check:
+  executor: builder_container_otp22
+  steps:
+    - fixed_checkout
+    - run:
+        name: Ensure lock file is up-to-date
+        command: |
+          ./rebar3 upgrade
+          git diff --quiet -- rebar.lock || (echo "rebar.lock is not up-to-date" && exit 1)
+    - store_rebar3_crashdump
+    - fail_notification
+
+linux_package:
+  parameters:
+    aeplugin_devmode:
+      type: boolean
+      default: false
+    package_kind:
+      type: string
+      default: ""
+  environment:
+    PKG_KIND: << parameters.package_kind >>
+  executor: builder_container_otp22
+  steps:
+    - fixed_checkout
+    - when:
+        condition: << parameters.aeplugin_devmode >>
+        steps:
+          - aeplugin_install_devmode
+    - set_package_path
+    - test_arch_os_dependencies
+    - build_package
+    - store_artifacts:
+        path: /tmp/package_tests/node1/log
+    - store_artifacts:
+        path: /tmp/package_tests/node2/log
+    - store_artifacts:
+        path: /tmp/package_tests/node3/log
+    - store_package_artifacts
+    - store_rebar3_crashdump
+    - persist_to_workspace:
+        root: << pipeline.parameters.packages_workspace >>
+        paths:
+          - "*.tar.gz"
+    - fail_notification
+
+ubuntu_package:
+  executor: builder_container_1804
+  working_directory: /home/builder/aeternity_deb
+  steps:
+    - fixed_checkout
+    - build_ubuntu_package
+    - store_package_artifacts
+    - persist_to_workspace:
+        root: << pipeline.parameters.packages_workspace >>
+        paths:
+          - "*.deb"
+    - fail_notification
+
+osx_package:
+  parameters:
+    aeplugin_devmode:
+      type: boolean
+      default: false
+    package_kind:
+      type: string
+      default: ""
+  macos:
+    xcode: "11.1.0" # 11.1.0 is macOS 10.14.4
+  working_directory: /home/circleci/aeternity
+  environment:
+    PKG_KIND: << parameters.package_kind >>
+  steps:
+    - fixed_checkout
+    - when:
+        condition: << parameters.aeplugin_devmode >>
+        steps:
+          - aeplugin_install_devmode
+    - restore_macos_package_cache
+    - run:
+        name: Install required tools
+        # libsodium headers cannot be found without explicit brew link
+        command: |
+          git -C "/usr/local/Homebrew/Library/Taps/homebrew/homebrew-core" fetch --unshallow
+          git -C "/usr/local/Homebrew/Library/Taps/homebrew/homebrew-cask" fetch --unshallow
+          brew update
+          brew rm python@2
+          brew install gmp libsodium erlang@22 cmake
+          brew link gmp
+          brew link libsodium
+          brew link --force erlang@22
+          brew link cmake
+    - save_macos_package_cache
+    - set_package_path
+    - test_arch_os_dependencies
+    - build_package
+    - store_artifacts:
+        path: /tmp/package_tests/node1/log
+    - store_artifacts:
+        path: /tmp/package_tests/node2/log
+    - store_artifacts:
+        path: /tmp/package_tests/node3/log
+    - store_package_artifacts
+    - persist_to_workspace:
+        root: << pipeline.parameters.packages_workspace >>
+        paths:
+          - "*.tar.gz"
+    - fail_notification
+
+docker_smoke_tests:
+  executor: buildpack
+  steps:
+    - fixed_checkout
+    - setup_docker
+    - docker_build_branch
+
+docker_js_sdk_smoke_test:
+  executor: buildpack
+  environment:
+    - AE__CHAIN__PERSIST: false
+    - AE__FORK_MANAGEMENT__NETWORK_ID: local_iris_testnet
+  steps:
+    - fixed_checkout
+    - setup_docker
+    - docker_build_branch
+    - run:
+        name: Start NodeJS
+        command: docker run -d --network container:ae_${CIRCLE_SHA1:?} --name nodejs circleci/node:15.0.0-buster sleep 1337
+    - run:
+        name: Copy tests
+        command: docker cp ./sdk_smoke_test/aepp-sdk-js nodejs:/tests
+    - run:
+        name: Run JS SDK smoke test
+        command: docker exec -it nodejs sh -c "cd /tests && npm ci && npm test"
+
+docker_db_smoke_test:
+  docker:
+    - image: circleci/buildpack-deps:bionic
+  environment:
+    - DOCKERHUB_REPO: aeternity/aeternity
+    - AE__CHAIN__PERSIST: true
+  steps:
+    - fixed_checkout
+    - setup_docker
+    - run:
+        name: Install OS Deps
+        command: sudo apt-get update && sudo apt-get install -y libsodium23 libtinfo5 libssl1.0
+    - run:
+        name: Download latest release package
+        command: wget https://releases.aeternity.io/aeternity-latest-ubuntu-x86_64.tar.gz
+    - run:
+        name: Unzip stable node
+        command: mkdir node_stable && tar -xvf aeternity-latest-ubuntu-x86_64.tar.gz -C ./node_stable
+    - run:
+        name: Generate an old DB
+        command: |
+          ./node_stable/bin/aeternity start
+          sleep 60 # Let it sync a bit
+          ./node_stable/bin/aeternity stop
+    - run:
+        name: Build branch docker image
+        command: |
+          docker pull aeternity/builder:bionic-otp22
+          docker build -t ${DOCKERHUB_REPO:?}:${CIRCLE_BRANCH/\//_} .
+    - run:
+        name: Start container
+        command: |
+          docker run -d --name ae_${CIRCLE_SHA1:?} ${DOCKERHUB_REPO:?}:${CIRCLE_BRANCH/\//_} sleep 1337
+    - run:
+        name: Copy the old DB into the container
+        command: |
+          docker exec -u root -it ae_${CIRCLE_SHA1:?} mkdir /old_db
+          docker cp ./node_stable/data/mnesia ae_${CIRCLE_SHA1:?}:/old_db/mnesia
+          docker exec -u root -it ae_${CIRCLE_SHA1:?} chown -R aeternity:aeternity /old_db/mnesia
+    - run:
+        name: Exec the node
+        command: |
+          export AE__CHAIN__DB_PATH=/old_db
+          docker exec -it -e AE__CHAIN__DB_PATH -e AE__CHAIN__PERSIST -e AE__FORK_MANAGEMENT__NETWORK_ID ae_${CIRCLE_SHA1:?} bin/aeternity console -noinput
+        background: true
+    - run:
+        name: Wait for the node to be ready
+        command: |
+          docker exec -it ae_${CIRCLE_SHA1:?} curl -4 --retry-connrefused --max-time 60 --retry 6 --connect-timeout 10 http://localhost:3013/v2/status
+    - run:
+        name: Health check
+        command: |
+          until [ "`docker inspect -f {{.State.Health.Status}} ae_${CIRCLE_SHA1:?}`"=="healthy" ]; do
+              sleep 1;
+          done;
+
+docker_test_push_branch:
+  executor: buildpack
+  parameters:
+    tag_suffix:
+      type: string
+      default: ""
+    aeplugin_devmode:
+      type: boolean
+      default: false
+  steps:
+    - fixed_checkout
+    - when:
+        condition: << parameters.aeplugin_devmode >>
+        steps:
+          - aeplugin_install_devmode
+    - setup_docker
+    - docker_build_branch:
+        tag_suffix: <<parameters.tag_suffix>>
+    - run:
+        name: Push Docker image to DockerHub
+        command: |
+          docker login -u $DOCKER_USER -p $DOCKER_PASS
+          docker push ${DOCKERHUB_REPO:?}:${CIRCLE_BRANCH/\//_}<<parameters.tag_suffix>>
+    - fail_notification
+
+docker_push_latest:
+  executor: infrastructure_container_stable
+  parameters:
+    tag_suffix:
+      type: string
+      default: ""
+    aeplugin_devmode:
+      type: boolean
+      default: false
+  steps:
+    - fixed_checkout
+    - when:
+        condition: << parameters.aeplugin_devmode >>
+        steps:
+          - aeplugin_install_devmode
+    - setup_docker
+    - docker_login
+    - run:
+        name: Build and push Docker image to DockerHub
+        command: |
+          docker pull ${DOCKERHUB_REPO:?}:${CIRCLE_TAG:?}
+          docker tag ${DOCKERHUB_REPO:?}:${CIRCLE_TAG:?} ${DOCKERHUB_REPO:?}:latest<< parameters.tag_suffix >>
+          docker push ${DOCKERHUB_REPO:?}:latest<< parameters.tag_suffix >>
+
+docker_push_tag:
+  executor: infrastructure_container_stable
+  parameters:
+    tag_suffix:
+      type: string
+      default: ""
+    aeplugin_devmode:
+      type: boolean
+      default: false
+  steps:
+    - fixed_checkout
+    - when:
+        condition: << parameters.aeplugin_devmode >>
+        steps:
+          - aeplugin_install_devmode
+    - setup_docker
+    - docker_login
+    - run:
+        name: Build and push Docker image to DockerHub
+        command: |
+          docker build -t ${DOCKERHUB_REPO:?}:${CIRCLE_TAG:?}<< parameters.tag_suffix >> .
+          docker push ${DOCKERHUB_REPO:?}:${CIRCLE_TAG:?}<< parameters.tag_suffix >>
+
+docker_system_tests:
+  executor: machine_1604
+  steps:
+    - print_system_test_host_info
+    - fixed_checkout
+    - install_os_deps
+    - install_otp
+    - install_libsodium
+    - restore_rebar_cache
+    - restore_machine_build_cache
+    - prepare_ubuntu_user
+    - install_system_test_deps
+    - run:
+        name: System Tests
+        no_output_timeout: 2h
+        command: |
+          sudo -u ubuntu -E -H make system-test
+    - collect_system_test_host_logs
+    - fail_notification_system_test
+    - save_machine_build_cache
+    - store_test_results:
+        path: << pipeline.parameters.system_test_logs >>
+    - store_artifacts:
+        path: << pipeline.parameters.system_test_logs >>
+    - store_artifacts:
+        path: << pipeline.parameters.system_test_host_logs >>
+
+docker_system_smoke_tests:
+  executor: machine_1604
+  steps:
+    - print_system_test_host_info
+    - fixed_checkout
+    - install_os_deps
+    - install_otp
+    - install_libsodium
+    - restore_machine_build_cache
+    # keep user preparation step after cache restore because of perms
+    - prepare_ubuntu_user
+    - install_system_smoke_test_deps
+    - run:
+        name: System Smoke Tests
+        no_output_timeout: 1h
+        command: |
+          sudo -u ubuntu -E -H make smoke-test-run
+    - collect_system_test_host_logs
+    - fail_notification_system_test
+    - save_machine_build_cache
+    - store_test_results:
+        path: << pipeline.parameters.system_test_logs >>
+    - store_artifacts:
+        path: << pipeline.parameters.system_test_logs >>
+    - store_artifacts:
+        path: << pipeline.parameters.system_test_host_logs >>
+
+js_sdk_smoke_test:
+  docker:
+    - image: circleci/buildpack-deps:bionic
+  environment:
+    - AE__CHAIN__PERSIST: false
+    - AE__FORK_MANAGEMENT__NETWORK_ID: local_iris_testnet
+    - PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - fixed_checkout
+    - run:
+        name: Install OS Deps
+        command: |
+          curl -fsSL https://deb.nodesource.com/setup_15.x | sudo -E bash -
+          sudo apt-get update && sudo apt-get install -y nodejs libsodium23 libtinfo5 libssl1.0
+    - set_package_path
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - run:
+        name: Install JS SDK
+        command: cd ./sdk_smoke_test/aepp-sdk-js && npm ci
+    - run:
+        name: Unzip built node
+        command: mkdir node && tar -xvf ${PACKAGE_TARBALL:?} -C ./node
+    - run:
+        name: Start node
+        command: ./node/bin/aeternity start
+    - run:
+        name: Wait for the node api to boot
+        command: curl -4 --retry-connrefused --max-time 60 --retry 6 --connect-timeout 10 http://localhost:3013/v2/status
+    - run:
+        name: Run js sdk smoke test
+        command: cd ./sdk_smoke_test/aepp-sdk-js && npm test
+    - run:
+        name: Stop node
+        command: ./node/bin/aeternity stop
+    - fail_notification
+
+db_smoke_test:
+  docker:
+    - image: circleci/buildpack-deps:bionic
+  environment:
+    - AE__CHAIN__PERSIST: true
+    - PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - fixed_checkout
+    - run:
+        name: Install OS Deps
+        command: sudo apt-get update && sudo apt-get install -y libsodium23 libtinfo5 libssl1.0
+    - set_package_path
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - run:
+        name: Unzip built node
+        command: mkdir node_new && tar -xvf ${PACKAGE_TARBALL:?} -C ./node_new
+    - run:
+        name: Download latest release package
+        command: wget https://releases.aeternity.io/aeternity-latest-ubuntu-x86_64.tar.gz
+    - run:
+        name: Unzip stable node
+        command: mkdir node_stable && tar -xvf aeternity-latest-ubuntu-x86_64.tar.gz -C ./node_stable
+    - run:
+        name: Generate an old DB
+        command: |
+          ./node_stable/bin/aeternity start
+          sleep 60 # Let it sync a bit
+          curl http://localhost:3013/v2/status
+          ./node_stable/bin/aeternity stop
+    - run:
+        name: Test DB compatibility
+        command: |
+          cp -r ./node_stable/data/mnesia ./node_new/data/
+          ./node_new/bin/aeternity start
+          sleep 30
+          curl http://localhost:3013/v2/status
+          ./node_new/bin/aeternity stop
+
+deploy_integration:
+  executor: infrastructure_container_unstable
+  environment:
+    - DEPLOY_ENV: integration
+    - DEPLOY_DOWNTIME: 900 #15M
+  steps:
+    - deploy_steps
+
+deploy_next:
+  executor: infrastructure_container_unstable
+  environment:
+    - DEPLOY_ENV: next
+    - DEPLOY_DOWNTIME: 900 #15M
+  steps:
+    - deploy_steps
+
+deploy_dev1:
+  executor: infrastructure_container_unstable
+  environment:
+    - DEPLOY_ENV: dev1
+  steps:
+    - deploy_steps
+
+deploy_dev2:
+  executor: infrastructure_container_unstable
+  environment:
+    - DEPLOY_ENV: dev2
+  steps:
+    - deploy_steps
+
+deploy_uat_blue:
+  executor: infrastructure_container_stable
+  environment:
+    - DEPLOY_ENV: uat
+    - DEPLOY_COLOR: blue
+    - DEPLOY_DOWNTIME: 1800 #30M
+  steps:
+    - deploy_steps
+
+deploy_uat_green:
+  executor: infrastructure_container_stable
+  environment:
+    - DEPLOY_ENV: uat
+    - DEPLOY_COLOR: green
+    - DEPLOY_DOWNTIME: 1800 #30M
+  steps:
+    - deploy_steps
+
+# Upload artifacts
+upload_build_artifacts:
+  executor: infrastructure_container_stable
+  environment:
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - upload_build_artifacts
+
+upload_packages_osx:
+  executor: infrastructure_container_stable
+  environment:
+    PKG_TARGET_OS: macos
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - upload_release_artifacts
+
+upload_packages_linux:
+  executor: infrastructure_container_stable
+  environment:
+    PKG_TARGET_OS: ubuntu
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - upload_release_artifacts
+
+publish_build_packages:
+  executor: buildpack
+  steps:
+    - fixed_checkout
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - publish_ubuntu_package:
+        packages_dir: << pipeline.parameters.packages_workspace >>
+        component: testing
+    - fail_notification
+
+publish_release_packages:
+  executor: buildpack
+  steps:
+    - fixed_checkout
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - publish_ubuntu_package:
+        packages_dir: << pipeline.parameters.packages_workspace >>
+        component: main
+    - publish_osx_package:
+        packages_dir: << pipeline.parameters.packages_workspace >>
+        branch: master
+    - fail_notification
+
+upload_latest_packages_osx:
+  executor: infrastructure_container_stable
+  environment:
+    PKG_TARGET_OS: macos
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - upload_latest_artifacts
+
+upload_latest_packages_linux:
+  executor: infrastructure_container_stable
+  environment:
+    PKG_TARGET_OS: ubuntu
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - upload_latest_artifacts
+
+verify_release_artifacts:
+  executor: infrastructure_container_stable
+  environment:
+    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+  steps:
+    - run:
+        name: Verify release artifacts
+        command: |
+          /infrastructure/scripts/check_release_artifacts.sh ${CIRCLE_TAG}
+
+build_uml_diagrams:
+  docker:
+    - image: circleci/openjdk:11-jdk-stretch
+  steps:
+    - fixed_checkout
+    - run:
+        name: Install PlantUML dependencies
+        command: |
+          sudo apt-get -qq -y update && sudo apt-get -qq -y install graphviz librsvg2-bin
+    - run: make build-uml
+    - store_artifacts:
+        path: docs/state-channels
+    - fail_notification

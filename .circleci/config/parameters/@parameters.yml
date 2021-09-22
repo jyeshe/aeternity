@@ -1,0 +1,55 @@
+aeplugin_devmode_version:
+  type: string
+  default: "0.2.0"
+
+tag_regex:
+  type: string
+  default: "/^v.*$/"
+
+master_branch:
+  type: string
+  default: master
+
+packages_workspace:
+  type: string
+  default: /tmp/packages
+
+container_otp22_plt:
+  type: string
+  default: _build/default/rebar3_22.3.4.9_plt
+
+container_otp23_plt:
+  type: string
+  default: _build/default/rebar3_23.3.4.5_plt
+
+rebar_cache_key:
+  type: string
+  default: rebar-cache-{{ checksum "rebar.lock" }}-{{ checksum "rebar.config" }}
+
+build_otp22_cache_key:
+  type: string
+  default: build-otp22-cache-v3-{{ .Revision }}
+
+build_otp23_cache_key:
+  type: string
+  default: build-otp23-cache-v4-{{ .Revision }}
+
+build_nix_cache_key:
+  type: string
+  default: build-nix-cache-v3-{{ .Revision }}
+
+machine_build_cache_key:
+  type: string
+  default: machine-build-cache-v19-{{ .Branch }}-{{ .Revision }}
+
+macos_package_cache_key:
+  type: string
+  default: macos-package-cache-v4
+
+system_test_logs:
+  type: string
+  default: system_test/logs
+
+system_test_host_logs:
+  type: string
+  default: /tmp/system_test_host

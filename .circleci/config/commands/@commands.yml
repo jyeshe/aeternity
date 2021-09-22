@@ -1,0 +1,587 @@
+fail_notification:
+  steps:
+    - run:
+        name: Send failure notification
+        environment:
+          NOTIFY_BRANCH: << pipeline.parameters.master_branch >>
+          HOOK_TEMPLATE: |
+            {
+              "text": "CircleCI job **%s** failed on branch **%s** by @%s",
+              "attachments": [
+                {
+                  "title": "Build Link",
+                  "title_link": "%s",
+                  "color": "#FAD6D6"
+                }
+              ]
+            }
+        command: |
+          if [ -n "$CIRCLE_BRANCH" ]; then
+            if [ "$CIRCLE_BRANCH" = "${NOTIFY_BRANCH:?}" ]; then
+              HOOK_DATA=$(printf "$HOOK_TEMPLATE" "${CIRCLE_JOB:?}" "${CIRCLE_BRANCH:?}" "${CIRCLE_USERNAME:-unknown}" "${CIRCLE_BUILD_URL:?}")
+              curl -X POST -H 'Content-Type: application/json' ${ROCKET_HOOK_URL:?} --data "${HOOK_DATA:?}"
+            fi
+          fi
+        when: on_fail
+
+
+fail_notification_nix:
+  steps:
+    - run:
+        name: Send failure notification
+        environment:
+          NOTIFY_BRANCH: << pipeline.parameters.master_branch >>
+          HOOK_TEMPLATE: |
+            {
+              "text": "CircleCI job **%s** failed on branch **%s** by @%s",
+              "attachments": [
+                {
+                  "title": "Build Link",
+                  "title_link": "%s",
+                  "color": "#FAD6D6"
+                }
+              ]
+            }
+        command: |
+          if [ -n "$CIRCLE_BRANCH" ]; then
+            if [ "$CIRCLE_BRANCH" = "${NOTIFY_BRANCH:?}" ]; then
+              HOOK_DATA=$(printf "$HOOK_TEMPLATE" "${CIRCLE_JOB:?}" "${CIRCLE_BRANCH:?}" "${CIRCLE_USERNAME:-unknown}" "${CIRCLE_BUILD_URL:?}")
+              nix-shell webhook.nix -j auto --run "curl -X POST -H 'Content-Type: application/json' ${ROCKET_HOOK_URL:?} --data \"${HOOK_DATA:?}\""
+            fi
+          fi
+        when: on_fail
+
+fail_notification_system_test:
+  steps:
+    - run:
+        name: Send failure notification on system test
+        environment:
+          NOTIFY_BRANCH: << pipeline.parameters.master_branch >>
+          HOOK_TEMPLATE: |
+            {
+              "text": "CircleCI job **%s** failed on branch **%s** by @%s",
+              "attachments": [
+                {
+                  "title": "Build Link",
+                  "title_link": "%s",
+                  "color": "#FAD6D6"
+                }
+              ]
+            }
+        command: |
+          if [ -n "$CIRCLE_BRANCH" ]; then
+            if [ "$CIRCLE_BRANCH" = "${NOTIFY_BRANCH:?}" ]; then
+              HOOK_DATA=$(printf "$HOOK_TEMPLATE" "${CIRCLE_JOB:?}" "${CIRCLE_BRANCH:?}" "${CIRCLE_USERNAME:-unknown}" "${CIRCLE_BUILD_URL:?}")
+              curl -X POST -H 'Content-Type: application/json' ${ROCKET_HOOK_URL_SYSTEM_TEST:?} --data "${HOOK_DATA:?}"
+            fi
+          fi
+        when: on_fail
+
+set_package_path:
+  steps:
+    - run:
+        name: Set package path
+        environment:
+          PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+        # construct and export PACKAGE_TARBALL environment variable available to all jobs
+        command: .circleci/scripts/set_package_path.sh
+
+fixed_checkout:
+  steps:
+    - checkout
+    - run:
+        name: Reset to proper SHA1
+        command: |
+          if [ -n "$CIRCLE_TAG" ]; then
+            git reset --hard $(git rev-parse "$CIRCLE_TAG")
+          fi
+
+setup_secrets:
+  steps:
+    - run:
+        name: Setup environment secrets
+        command: cd /infrastructure && make secrets SECRETS_OUTPUT_DIR=/secrets
+
+aeplugin_install_devmode:
+  steps:
+    - run:
+        name: Download devmode plugin
+        command: |
+          export PLUGIN_VERSION=<< pipeline.parameters.aeplugin_devmode_version >>
+          curl -fsSLOJ https://github.com/aeternity/aeplugin_dev_mode/releases/download/v$PLUGIN_VERSION/aeplugin_dev_mode.tar.gz
+          tar -zxf aeplugin_dev_mode.tar.gz -C plugins/
+
+
+install_os_deps:
+  steps:
+    - run:
+        name: Install OS dependancies
+        command: |
+          sudo apt-get update
+          sudo apt-get -qq -y install git curl \
+            autoconf build-essential ncurses-dev libssl-dev libgmp-dev
+
+install_otp:
+  steps:
+    - run:
+        name: Install OTP
+        command: |
+          # Install OTP package deps
+          sudo apt-get update && sudo apt-get install libwxbase3.0-dev libwxgtk3.0-dev libsctp1
+          # Install OTP binary package
+          PACKAGE_NAME=esl-erlang_${OTP_VERSION}-1~ubuntu~xenial_amd64.deb
+          OTP_DOWNLOAD_URL=https://packages.erlang-solutions.com/erlang/debian/pool/${PACKAGE_NAME}
+          curl -fsSL -o ${PACKAGE_NAME} "$OTP_DOWNLOAD_URL"
+          sudo dpkg -i ${PACKAGE_NAME}
+
+install_libsodium:
+  steps:
+    - run:
+        name: Install libsodium
+        # source: https://github.com/aeternity/docker-builder/blob/master/Dockerfile#L23
+        command: |
+          LIBSODIUM_DOWNLOAD_URL="https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VERSION}/libsodium-${LIBSODIUM_VERSION}.tar.gz" \
+            && curl -fsSL -o libsodium-src.tar.gz "$LIBSODIUM_DOWNLOAD_URL" \
+            && mkdir libsodium-src \
+            && tar -zxf libsodium-src.tar.gz -C libsodium-src --strip-components=1 \
+            && cd libsodium-src \
+            && ./configure && make -j$(nproc) && sudo make install && sudo ldconfig
+
+restore_rebar_cache:
+  steps:
+    - restore_cache:
+        key: << pipeline.parameters.rebar_cache_key >>
+
+restore_build_otp22_cache:
+  steps:
+    - restore_cache:
+        key: << pipeline.parameters.build_otp22_cache_key >>
+
+restore_build_otp23_cache:
+  steps:
+    - restore_cache:
+        key: << pipeline.parameters.build_otp23_cache_key >>
+
+restore_build_nix_cache:
+  steps:
+    - restore_cache:
+        key: << pipeline.parameters.build_nix_cache_key >>
+
+restore_machine_build_cache:
+  steps:
+    - restore_cache:
+        keys:
+          - << pipeline.parameters.machine_build_cache_key >>
+          - machine-build-cache-v19-{{ .Branch }}-
+          - machine-build-cache-v19-
+
+save_machine_build_cache:
+  steps:
+    - save_cache:
+        key: << pipeline.parameters.machine_build_cache_key >>
+        paths:
+          - "_build"
+          - ".contracts_test_cache"
+
+restore_macos_package_cache:
+  steps:
+    - restore_cache:
+        key: << pipeline.parameters.macos_package_cache_key >>
+
+save_macos_package_cache:
+  steps:
+    - save_cache:
+        key: << pipeline.parameters.macos_package_cache_key >>
+        paths:
+          - "/usr/local/Homebrew"
+          - "/usr/local/opt"
+          - "/usr/local/Cellar"
+
+build_package:
+  steps:
+    - run:
+        name: Build Package Tarball
+        environment:
+          PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+          ERLANG_ROCKSDB_OPTS: "-DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON"
+        command: |
+          # Ensure rocksdb gets build statically
+          rm -rf _build/default/lib/rocksdb/
+          rm -rf _build/default/lib/mnesia_rocksdb
+          # Build the package
+          make prod-package
+          mkdir ${PACKAGES_DIR:?}
+          mv _build/prod/rel/aeternity/aeternity-$(cat VERSION).tar.gz ${PACKAGE_TARBALL:?}
+
+build_ubuntu_package:
+  steps:
+    - run:
+        name: Build Ubuntu package (*.deb)
+        environment:
+          PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+          # The *clean commands are for work-around in CircleCI
+          # Debian/Ubuntu package building (clean issues; fakeroot and
+          # rebar3).
+          #
+          # The debian/rules file has conditional *clean targets based on
+          # DEB_SKIP_DH_AUTO_CLEAN.
+          #
+          # This prevents the presence of broken/dummy debian/rules file without
+          # clean targets. For example when running debuild directly without
+          # `make prod-deb-package`.
+          DEB_SKIP_DH_AUTO_CLEAN: "true"
+          ERLANG_ROCKSDB_BUILDOPTS: "-j2"
+          ERLANG_ROCKSDB_OPTS: "-DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON"
+        command: |
+          make distclean
+          make prod-deb-package
+          mkdir ${PACKAGES_DIR:?}
+          mv _build/../../*aeternity-node_*.deb ${PACKAGES_DIR:?}
+
+test_steps_otp22:
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp22_cache
+    - run:
+        name: Test
+        command: |
+          epmd -daemon
+          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/scripts/split_suites.sh)"
+    # Isolates the junit.xml report because additional files in _build/test/logs
+    # are somehow causing issue with xunit report upload, parsing and merging
+    - run:
+        name: move test report
+        command: |
+          mkdir _build/test/reports
+          mv _build/test/logs/junit.xml _build/test/reports/
+    - store_test_results:
+        path: _build/test/reports
+    - trim_test_artifacts
+    - store_artifacts:
+        path: _build/test/logs
+    - store_rebar3_crashdump
+    - fail_notification
+
+test_steps_otp23:
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp23_cache
+    - run:
+        name: Test
+        command: |
+          epmd -daemon
+          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/scripts/split_suites.sh)"
+    # Isolates the junit.xml report because additional files in _build/test/logs
+    # are somehow causing issue with xunit report upload, parsing and merging
+    - run:
+        name: move test report
+        command: |
+          mkdir _build/test/reports
+          mv _build/test/logs/junit.xml _build/test/reports/
+    - store_test_results:
+        path: _build/test/reports
+    - trim_test_artifacts
+    - store_artifacts:
+        path: _build/test/logs
+    - store_rebar3_crashdump
+    - fail_notification
+
+eunit_steps_otp22:
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp22_cache
+    - run:
+        name: Test
+        command: |
+          epmd -daemon
+          make ${MAKE_TARGET:?}
+    - store_test_results:
+        path: eunit_report
+    - store_rebar3_crashdump
+    - fail_notification
+
+eunit_steps_otp23:
+  steps:
+    - fixed_checkout
+    - restore_rebar_cache
+    - restore_build_otp23_cache
+    - run:
+        name: Test
+        command: |
+          epmd -daemon
+          make ${MAKE_TARGET:?}
+    - store_test_results:
+        path: eunit_report
+    - store_rebar3_crashdump
+    - fail_notification
+
+test_arch_os_dependencies:
+  steps:
+    - run:
+        name: Test architecture or OS specific functions
+        command: |
+          make test-arch-os-dependencies
+
+store_package_artifacts:
+  steps:
+    - store_artifacts:
+        path: << pipeline.parameters.packages_workspace >>
+        destination: /
+
+store_rebar3_crashdump:
+  steps:
+    - store_artifacts:
+        path: rebar3.crashdump
+
+setup_docker:
+  steps:
+    - setup_remote_docker:
+        docker_layer_caching: true
+        version: "17.09.0-ce"
+
+prepare_ubuntu_user:
+  steps:
+    - run:
+        name: Prepare ubuntu user (1000:1000) to run docker commands
+        command: |
+          sudo usermod -aG docker ubuntu
+          sudo chown -R ubuntu:ubuntu ~/aeternity
+
+docker_login:
+  steps:
+    - setup_secrets
+    - run:
+        name: Login to Docker Hub
+        command: |
+          docker login -u $(</secrets/DOCKER_USER) -p $(</secrets/DOCKER_PASS)
+
+docker_build_branch:
+  parameters:
+    tag_suffix:
+      type: string
+      default: ""
+  steps:
+    - run:
+        name: Build branch docker image
+        command: |
+          docker pull aeternity/builder:bionic-otp22
+          docker build -t ${DOCKERHUB_REPO:?}:${CIRCLE_BRANCH/\//_}<< parameters.tag_suffix >> .
+    - run:
+        name: Start branch docker image
+        command: |
+          docker run -d -e AE__CHAIN__PERSIST -e AE__FORK_MANAGEMENT__NETWORK_ID \
+            --name ae_${CIRCLE_SHA1:?} \
+            ${DOCKERHUB_REPO:?}:${CIRCLE_BRANCH/\//_}<< parameters.tag_suffix >> \
+            bin/aeternity console -noinput -network_id ae_test
+    - run:
+        name: Display logs from branch docker image
+        command: |
+          docker logs -f ae_${CIRCLE_SHA1:?}
+        background: true
+    - run:
+        name: Wait for container to be ready
+        command: |
+          docker exec -it ae_${CIRCLE_SHA1:?} curl -4 --retry-connrefused --max-time 60 --retry 6 --connect-timeout 10 http://localhost:3013/v2/status
+    - run:
+        name: Health check
+        command: |
+          until [ "`docker inspect -f {{.State.Health.Status}} ae_${CIRCLE_SHA1:?}`"=="healthy" ]; do
+              sleep 1;
+          done;
+
+upload_aws_build_artifacts:
+  steps:
+    - run:
+        name: Upload build artifacts to central repository (AWS)
+        command: |
+          if [ -z "$CIRCLE_PR_NUMBER" ]; then
+            envdir /secrets aws s3 cp --acl public-read ${PACKAGE_TARBALL:?} s3://${S3_BUILDS_BUCKET:?}/
+            if [ -n "$CIRCLE_BRANCH" -a "$CIRCLE_BRANCH" = "master" ]; then
+              envdir /secrets aws s3 cp --acl public-read ${PACKAGE_TARBALL:?} s3://${S3_BUILDS_BUCKET:?}/aeternity-latest-${PKG_SUFFIX:?}${PKG_EXT:-".tar.gz"}
+            fi
+          fi
+
+upload_aws_release_artifacts:
+  steps:
+    - run:
+        name: Upload release artifacts to central repository (AWS)
+        command: |
+          envdir /secrets aws s3 cp --acl public-read ${PACKAGE_TARBALL:?} s3://${S3_RELEASES_BUCKET:?}/
+
+upload_aws_latest_artifacts:
+  steps:
+    - run:
+        name: Upload latest release artifacts to central repository (AWS)
+        command: |
+          envdir /secrets aws s3 cp --acl public-read ${PACKAGE_TARBALL:?} s3://${S3_RELEASES_BUCKET:?}/aeternity-latest-${PKG_SUFFIX:?}${PKG_EXT:-".tar.gz"}
+
+upload_github_release_artifacts:
+  steps:
+    - run:
+        name: Upload GitHub Release Asset
+        command: |
+          envdir /secrets /infrastructure/scripts/upload-github-release-assets.sh github_api_token=${GITHUB_API_TOKEN:?} \
+            owner=${CIRCLE_PROJECT_USERNAME} repo=${CIRCLE_PROJECT_REPONAME} \
+            tag=${CIRCLE_TAG} ASSETS=${PACKAGES_DIR:?}/*
+
+publish_ubuntu_package:
+  parameters:
+    packages_dir:
+      type: string
+    component:
+      type: string
+  steps:
+    - run:
+        name: Checkout APT repository
+        command: |
+          git clone git@github.com:aeternity/apt-repo.git --branch inbox --single-branch ~/apt-repo
+    - run:
+        name: Add deb packages
+        command: |
+          cp << parameters.packages_dir >>/aeternity-node*.deb ~/apt-repo/inbox/aeternity-node/<< parameters.component >>/
+    - run:
+        name: Setup git
+        command: |
+          git config --global push.default simple
+          git config --global user.email "35604848+aeternity-bot@users.noreply.github.com"
+          git config --global user.name "Aeternity node CI"
+    - run:
+        name: Commit and push
+        command: |
+          cd ~/apt-repo
+          git add -A
+          git commit -m "Add aeternity node package to << parameters.component >>" || true
+          git push
+
+publish_osx_package:
+  parameters:
+    packages_dir:
+      type: string
+    branch:
+      type: string
+  steps:
+    - run:
+        name: Checkout Homebrew repository
+        command: |
+          git clone git@github.com:aeternity/homebrew-aeternity.git --branch << parameters.branch >> --single-branch ~/homebrew-aeternity
+    - run:
+        name: Update the Homebrew formula
+        command: |
+          make VERSION
+          VERSION=$(cat VERSION)
+          PACKAGE_URL=https://github.com/aeternity/aeternity/releases/download/v$VERSION/aeternity-$VERSION-macos-x86_64.tar.gz
+          SHA256=$(sha256sum << parameters.packages_dir >>/aeternity-*-macos-x86_64.tar.gz | head -1 | cut -f 1 -d " ")
+          cd ~/homebrew-aeternity/
+          sed -i "s|^  url .*|  url \"$PACKAGE_URL\"|g" Formula/aeternity-node.rb
+          sed -i "s|^  version .*|  version \"$VERSION\"|g" Formula/aeternity-node.rb
+          sed -i "s|^  sha256 .*|  sha256 \"$SHA256\"|g" Formula/aeternity-node.rb
+    - run:
+        name: Setup git
+        command: |
+          git config --global push.default simple
+          git config --global user.email "35604848+aeternity-bot@users.noreply.github.com"
+          git config --global user.name "Aeternity node CI"
+    - run:
+        name: Commit and push
+        command: |
+          make VERSION
+          VERSION=$(cat VERSION)
+          cd ~/homebrew-aeternity/
+          git add Formula/aeternity-node.rb
+          git diff --staged
+          git commit -m "Update aeternity-node formula to $VERSION"
+          git push
+
+upload_build_artifacts:
+  steps:
+    - fixed_checkout
+    - set_package_path
+    - setup_secrets
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - upload_aws_build_artifacts
+    - fail_notification
+
+upload_release_artifacts:
+  steps:
+    - fixed_checkout
+    - set_package_path
+    - setup_secrets
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - upload_github_release_artifacts
+    - upload_aws_release_artifacts
+
+upload_latest_artifacts:
+  steps:
+    - fixed_checkout
+    - set_package_path
+    - setup_secrets
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - upload_aws_latest_artifacts
+    - fail_notification
+
+deploy_steps:
+  steps:
+    - fixed_checkout
+    - set_package_path
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - run:
+        name: Deploy
+        environment:
+          PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
+        command: |
+          export PACKAGE=${PACKAGE_TARBALL:?}
+          export DEPLOY_DB_VERSION=$(cat deployment/DB_VERSION)
+          cd /infrastructure && make deploy
+
+install_system_test_deps:
+  steps:
+    - run:
+        name: Install deps for system tests
+        command: |
+          make system-test-deps
+
+install_system_smoke_test_deps:
+  steps:
+    - run:
+        name: Install deps for system smoke tests
+        command: |
+          make system-smoke-test-deps
+
+
+print_system_test_host_info:
+  steps:
+    - run:
+        name: Print system test host information
+        command: |
+          uname -a
+          free -t -m
+
+
+collect_system_test_host_logs:
+  steps:
+    - run:
+        name: Collect system test host logs
+        environment:
+          SYSTEM_TEST_HOST_LOGS_DIR: << pipeline.parameters.system_test_host_logs >>
+        command: |
+          mkdir ${SYSTEM_TEST_HOST_LOGS_DIR:?}
+          dmesg > ${SYSTEM_TEST_HOST_LOGS_DIR:?}/dmesg.log
+        when: always
+
+trim_test_artifacts:
+  steps:
+    - run:
+        name: trim down artifacts
+        command: |
+          find _build/test/logs -iname bin | xargs rm -rf
+          find _build/test/logs -iname data | xargs rm -rf
+          find _build/test/logs -iname releases | xargs rm -rf
+          find _build/test/logs -iname extensions | xargs rm -rf
+          find _build/test/logs -iname hooks | xargs rm -rf
