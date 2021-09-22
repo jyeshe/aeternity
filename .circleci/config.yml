@@ -175,7 +175,7 @@ references:
       environment:
         PACKAGES_DIR: *packages_workspace
       # construct and export PACKAGE_TARBALL environment variable available to all jobs
-      command: .circleci/set_package_path.sh
+      command: .circleci/scripts/set_package_path.sh
 
   build_package: &build_package
     run:
@@ -370,7 +370,7 @@ references:
         name: Test
         command: |
           epmd -daemon
-          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/split_suites.sh)"
+          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/scripts/split_suites.sh)"
     # Isolates the junit.xml report because additional files in _build/test/logs
     # are somehow causing issue with xunit report upload, parsing and merging
     - run:
@@ -394,7 +394,7 @@ references:
         name: Test
         command: |
           epmd -daemon
-          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/split_suites.sh)"
+          make ${MAKE_TARGET:?} CT_TEST_FLAGS="--suite=$(.circleci/scripts/split_suites.sh)"
     # Isolates the junit.xml report because additional files in _build/test/logs
     # are somehow causing issue with xunit report upload, parsing and merging
     - run:
