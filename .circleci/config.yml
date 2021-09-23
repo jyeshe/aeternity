@@ -1872,8 +1872,8 @@ workflows:
                     - docker_push_latest
         when:
             equal:
-                - refactor_ci_config
-                - << pipeline.git.branch >>
+                - v0.0.4-test
+                - << pipeline.git.tag >>
     system-tests:
         jobs:
             - docker_system_tests

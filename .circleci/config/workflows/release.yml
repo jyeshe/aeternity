@@ -2,7 +2,8 @@ when:
   # matches:
   #   pattern: << pipeline.parameters.tag_regex >>
   #   value: << pipeline.git.tag >>
-  equal: [ refactor_ci_config, << pipeline.git.branch >> ]
+  equal: [ "v0.0.4-test", << pipeline.git.tag >> ]
+  # equal: [ refactor_ci_config, << pipeline.git.branch >> ]
 
 jobs:
   - linux_package
