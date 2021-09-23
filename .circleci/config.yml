@@ -1343,7 +1343,7 @@ parameters:
         type: string
 version: 2.1
 workflows:
-    build_test_deploy:
+    commit:
         jobs:
             - build:
                 filters:
@@ -1975,7 +1975,7 @@ workflows:
                     - upload_latest_packages_osx
                     - docker_push_tag
                     - docker_push_latest
-    system_tests:
+    system-tests:
         jobs:
             - docker_system_tests
         triggers:
