@@ -2,11 +2,14 @@ when:
   # matches:
   #   pattern: << pipeline.parameters.tag_regex >>
   #   value: << pipeline.git.tag >>
-  equal: [ "v0.0.4-test", << pipeline.git.tag >> ]
+  equal: [ "v0.0.5-test", << pipeline.git.tag >> ]
   # equal: [ refactor_ci_config, << pipeline.git.branch >> ]
 
 jobs:
-  - linux_package
+  - linux_package:
+      filters:
+        tags:
+          only: << pipeline.parameters.tag_regex >>
 
   - linux_package:
       name: linux_package_bundle

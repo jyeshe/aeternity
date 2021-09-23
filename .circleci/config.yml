@@ -1780,7 +1780,10 @@ workflows:
                     - build
     release:
         jobs:
-            - linux_package
+            - linux_package:
+                filters:
+                    tags:
+                        only: << pipeline.parameters.tag_regex >>
             - linux_package:
                 aeplugin_devmode: true
                 name: linux_package_bundle
@@ -1872,7 +1875,7 @@ workflows:
                     - docker_push_latest
         when:
             equal:
-                - v0.0.4-test
+                - v0.0.5-test
                 - << pipeline.git.tag >>
     system-tests:
         jobs:
