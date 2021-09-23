@@ -1871,9 +1871,9 @@ workflows:
                     - docker_push_tag
                     - docker_push_latest
         when:
-            matches:
-                pattern: << pipeline.parameters.tag_regex >>
-                value: << pipeline.git.tag >>
+            equal:
+                - refactor_ci_config
+                - << pipeline.git.branch >>
     system-tests:
         jobs:
             - docker_system_tests
