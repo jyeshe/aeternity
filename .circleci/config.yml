@@ -1384,6 +1384,8 @@ workflows:
                 filters:
                     branches:
                         ignore:
+                            - env/dev1
+                            - env/dev2
                             - system-tests
                 name: linux-package-bundle
                 package_name_suffix: bundle
