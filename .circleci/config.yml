@@ -1475,6 +1475,7 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
+                name: linux-release-tarball
                 package_name: aeternity-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
             - linux-tarball:
                 aeplugin_devmode: true
@@ -1483,7 +1484,7 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: linux-tarball-bundle
+                name: linux-release-tarball-bundle
                 package_name: aeternity-bundle-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
             - ubuntu_package:
                 filters:
@@ -1497,7 +1498,7 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: macos-tarball
+                name: macos-release-tarball
                 package_name: aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
             - macos-tarball:
                 aeplugin_devmode: true
@@ -1506,7 +1507,7 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: macos-tarball-bundle
+                name: macos-release-tarball-bundle
                 package_name: aeternity-bundle-$CIRCLE_TAG-macos-x86_64.tar.gz
             - hodl_artifact_upload:
                 filters:
@@ -1523,11 +1524,12 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
+                name: upload-release-tarballs-s3
                 requires:
-                    - linux-tarball
-                    - macos-tarball
-                    - linux-tarball-bundle
-                    - macos-tarball-bundle
+                    - linux-release-tarball
+                    - macos-release-tarball
+                    - linux-release-tarball-bundle
+                    - macos-release-tarball-bundle
                     - hodl_artifact_upload
             - upload-tarballs-github-release:
                 context: ae-node-builds
@@ -1537,10 +1539,10 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 requires:
-                    - linux-tarball
-                    - macos-tarball
-                    - linux-tarball-bundle
-                    - macos-tarball-bundle
+                    - linux-release-tarball
+                    - macos-release-tarball
+                    - linux-release-tarball-bundle
+                    - macos-release-tarball-bundle
                     - hodl_artifact_upload
             - hodl_blue:
                 filters:
@@ -1663,7 +1665,7 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: verify-release-artifacts
                 requires:
-                    - upload-tarballs-s3
+                    - upload-release-tarballs-s3
                     - upload-tarballs-github-release
                     - docker-image-tag
                     - docker-image-latest

@@ -1,5 +1,6 @@
 jobs:
   - linux-tarball:
+      name: linux-release-tarball
       package_name: aeternity-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
       filters:
         branches:
@@ -8,7 +9,7 @@ jobs:
           only: << pipeline.parameters.tag_regex >>
 
   - linux-tarball:
-      name: linux-tarball-bundle
+      name: linux-release-tarball-bundle
       package_name: aeternity-bundle-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
@@ -25,7 +26,7 @@ jobs:
           only: << pipeline.parameters.tag_regex >>
 
   - macos-tarball:
-      name: macos-tarball
+      name: macos-release-tarball
       package_name: aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
       filters:
         branches:
@@ -34,7 +35,7 @@ jobs:
           only: << pipeline.parameters.tag_regex >>
 
   - macos-tarball:
-      name: macos-tarball-bundle
+      name: macos-release-tarball-bundle
       package_name: aeternity-bundle-$CIRCLE_TAG-macos-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
@@ -52,13 +53,14 @@ jobs:
           only: << pipeline.parameters.tag_regex >>
 
   - upload-tarballs-s3:
+      name: upload-release-tarballs-s3
       bucket: << pipeline.parameters.s3_releases_bucket >>
       context: ae-node-builds
       requires:
-        - linux-tarball
-        - macos-tarball
-        - linux-tarball-bundle
-        - macos-tarball-bundle
+        - linux-release-tarball
+        - macos-release-tarball
+        - linux-release-tarball-bundle
+        - macos-release-tarball-bundle
         - hodl_artifact_upload
       filters:
         branches:
@@ -69,10 +71,10 @@ jobs:
   - upload-tarballs-github-release:
       context: ae-node-builds
       requires:
-        - linux-tarball
-        - macos-tarball
-        - linux-tarball-bundle
-        - macos-tarball-bundle
+        - linux-release-tarball
+        - macos-release-tarball
+        - linux-release-tarball-bundle
+        - macos-release-tarball-bundle
         - hodl_artifact_upload
       filters:
         branches:
@@ -222,7 +224,7 @@ jobs:
       requires:
         # - upload-release-tarballs
         # - upload-latest-release-tarballs
-        - upload-tarballs-s3
+        - upload-release-tarballs-s3
         - upload-tarballs-github-release
         - docker-image-tag
         - docker-image-latest
