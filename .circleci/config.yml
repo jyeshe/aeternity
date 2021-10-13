@@ -367,6 +367,19 @@ commands:
                     curl -fsSL -o ${PACKAGE_NAME} "$OTP_DOWNLOAD_URL"
                     sudo dpkg -i ${PACKAGE_NAME}
                 name: Install OTP
+    promote_latest_artifact_s3:
+        parameters:
+            uri:
+                type: string
+        steps:
+            - attach_workspace:
+                at: << pipeline.parameters.packages_workspace >>
+            - run:
+                command: |
+                    BUCKET=dirname << parameters.uri >>
+                    DST=$(basename << parameters.uri >> | sed -e 's/\(aeternity\)-.*-\(.*\)-\(.*\).tar.gz/\1-latest-\2-\3.tar.gz/g')
+                    envdir /secrets aws s3 cp --acl public-read << parameters.uri >> $BUCKET/$DST
+                name: Upload artifacts to s3
     restore_build_cache:
         parameters:
             otp:
@@ -981,6 +994,16 @@ jobs:
                 root: << pipeline.parameters.packages_workspace >>
             - fail_notification
         working_directory: /Users/distiller/aeternity
+    promote-tarball-s3:
+        executor: infrastructure_container_stable
+        parameters:
+            uri:
+                type: string
+        steps:
+            - fixed_checkout
+            - setup_secrets
+            - promote_latest_artifact_s3:
+                uri: << parameters.uri >>
     publish-build-packages:
         executor: buildpack
         steps:
@@ -1357,6 +1380,17 @@ workflows:
                 requires:
                     - linux-tarball
                     - linux-tarball-bundle
+            - promote-tarball-s3:
+                context: ae-node-builds
+                filters:
+                    branches:
+                        only:
+                            - /releases\/.*/
+                            - << pipeline.parameters.master_branch >>
+                name: promote-tarball-s3
+                requires:
+                    - linux-tarball
+                uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - macos-tarball:
                 filters:
                     branches:
@@ -1563,7 +1597,7 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: deploy-uat-blue
                 requires:
-                    - linux-tarball
+                    - linux-release-tarball
                     - hodl_blue
                 version: $CIRCLE_TAG
             - hodl_green:
@@ -1585,7 +1619,7 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: deploy-uat-green
                 requires:
-                    - linux-tarball
+                    - linux-release-tarball
                     - deploy-uat-blue
                     - hodl_green
                 version: $CIRCLE_TAG
@@ -1596,6 +1630,30 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 type: approval
+            - promote-tarball-s3:
+                context: ae-node-builds
+                filters:
+                    branches:
+                        ignore: /.*/
+                    tags:
+                        only: << pipeline.parameters.tag_regex >>
+                name: promote-release-linux-tarball-s3
+                requires:
+                    - linux-release-tarball
+                    - hodl_latest
+                uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
+            - promote-tarball-s3:
+                context: ae-node-builds
+                filters:
+                    branches:
+                        ignore: /.*/
+                    tags:
+                        only: << pipeline.parameters.tag_regex >>
+                name: promote-release-macos-tarball-s3
+                requires:
+                    - macos-release-tarball
+                    - hodl_latest
+                uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
             - publish-release-packages:
                 filters:
                     branches:
@@ -1603,8 +1661,8 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 requires:
-                    - linux-tarball
-                    - macos-tarball
+                    - linux-release-tarball
+                    - macos-release-tarball
                     - hodl_latest
             - docker-image:
                 context: ae-node-builds
@@ -1666,6 +1724,8 @@ workflows:
                 name: verify-release-artifacts
                 requires:
                     - upload-release-tarballs-s3
+                    - promote-release-linux-tarball-s3
+                    - promote-release-macos-tarball-s3
                     - upload-tarballs-github-release
                     - docker-image-tag
                     - docker-image-latest

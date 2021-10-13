@@ -21,6 +21,20 @@ upload_artifacts_s3:
         command: |
           envdir /secrets aws s3 sync --acl public-read << pipeline.parameters.packages_workspace >> s3://<< parameters.bucket >>/
 
+promote_latest_artifact_s3:
+  parameters:
+    uri:
+      type: string
+  steps:
+    - attach_workspace:
+        at: << pipeline.parameters.packages_workspace >>
+    - run:
+        name: Upload artifacts to s3
+        command: |
+          BUCKET=dirname << parameters.uri >>
+          DST=$(basename << parameters.uri >> | sed -e 's/\(aeternity\)-.*-\(.*\)-\(.*\).tar.gz/\1-latest-\2-\3.tar.gz/g')
+          envdir /secrets aws s3 cp --acl public-read << parameters.uri >> $BUCKET/$DST
+
 upload_artifacts_github:
   steps:
     - attach_workspace:

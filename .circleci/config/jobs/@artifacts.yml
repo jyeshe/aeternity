@@ -17,6 +17,17 @@ upload-tarballs-s3:
     #           version: latest
     - fail_notification
 
+promote-tarball-s3:
+  parameters:
+    uri:
+      type: string
+  executor: infrastructure_container_stable
+  steps:
+    - fixed_checkout
+    - setup_secrets
+    - promote_latest_artifact_s3:
+        uri: << parameters.uri >>
+  
 # upload-release-tarballs:
 #   executor: infrastructure_container_stable
 #   steps:

@@ -98,7 +98,7 @@ jobs:
       downtime: 1800 #30m
       context: ae-node-builds
       requires:
-        - linux-tarball
+        - linux-release-tarball
         - hodl_blue
       filters:
         branches:
@@ -122,7 +122,7 @@ jobs:
       downtime: 1800 #30m
       context: ae-node-builds
       requires:
-        - linux-tarball
+        - linux-release-tarball
         - deploy-uat-blue
         - hodl_green
       filters:
@@ -139,24 +139,36 @@ jobs:
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  # - upload-release-tarballs:
-  #     name: upload-latest-release-tarballs
-  #     suffix: -latest
-  #     context: ae-node-builds
-  #     requires:
-  #       - linux-tarball
-  #       - macos-tarball
-  #       - hodl_latest
-  #     filters:
-  #       branches:
-  #         ignore: /.*/
-  #       tags:
-  #         only: << pipeline.parameters.tag_regex >>
+  - promote-tarball-s3:
+      name: promote-release-linux-tarball-s3
+      uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
+      context: ae-node-builds
+      requires:
+        - linux-release-tarball
+        - hodl_latest
+      filters:
+        branches:
+          ignore: /.*/
+        tags:
+          only: << pipeline.parameters.tag_regex >>
+
+  - promote-tarball-s3:
+      name: promote-release-macos-tarball-s3
+      uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
+      context: ae-node-builds
+      requires:
+        - macos-release-tarball
+        - hodl_latest
+      filters:
+        branches:
+          ignore: /.*/
+        tags:
+          only: << pipeline.parameters.tag_regex >>
 
   - publish-release-packages:
       requires:
-        - linux-tarball
-        - macos-tarball
+        - linux-release-tarball
+        - macos-release-tarball
         - hodl_latest
       filters:
         branches:
@@ -222,9 +234,9 @@ jobs:
       name: verify-release-artifacts
       context: ae-node-builds
       requires:
-        # - upload-release-tarballs
-        # - upload-latest-release-tarballs
         - upload-release-tarballs-s3
+        - promote-release-linux-tarball-s3
+        - promote-release-macos-tarball-s3
         - upload-tarballs-github-release
         - docker-image-tag
         - docker-image-latest
