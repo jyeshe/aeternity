@@ -141,7 +141,7 @@ jobs:
 
   - js-sdk-smoke-test:
       requires:
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           ignore:
@@ -151,7 +151,7 @@ jobs:
 
   - db-smoke-test:
       requires:
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           ignore:
@@ -170,7 +170,7 @@ jobs:
             - system-tests
 
   - linux-tarball:
-      name: linux-build-tarball
+      name: linux-tarball
       package_name: aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
       filters:
         branches:
@@ -178,7 +178,7 @@ jobs:
             - system-tests
 
   - linux-tarball:
-      name: linux-build-tarball-bundle
+      name: linux-tarball-bundle
       package_name: aeternity-bundle-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
@@ -197,12 +197,12 @@ jobs:
             - << pipeline.parameters.master_branch >>
 
   - upload-tarballs-s3:
-      name: upload-build-tarballs-s3
+      name: upload-tarballs-s3
       bucket: << pipeline.parameters.s3_builds_bucket >>
       context: ae-node-builds
       requires:
-        - linux-build-tarball
-        - linux-build-tarball-bundle
+        - linux-tarball
+        - linux-tarball-bundle
       filters:
         branches:
           ignore:
@@ -213,6 +213,7 @@ jobs:
             - system-tests
 
   - macos-tarball:
+      name: macos-tarball
       package_name: aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
       requires: []
       filters:
@@ -254,7 +255,7 @@ jobs:
         - aevm-test
         - static-analysis
         - rebar_lock_check
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           only: << pipeline.parameters.master_branch >>
@@ -303,7 +304,7 @@ jobs:
         - aevm-test
         - static-analysis
         - rebar_lock_check
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           only: << pipeline.parameters.master_branch >>
@@ -314,7 +315,7 @@ jobs:
       env: dev1
       context: ae-node-builds
       requires:
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           only: env/dev1
@@ -325,7 +326,7 @@ jobs:
       env: dev2
       context: ae-node-builds
       requires:
-        - linux-build-tarball
+        - linux-tarball
       filters:
         branches:
           only: env/dev2

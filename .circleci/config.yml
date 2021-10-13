@@ -1300,7 +1300,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-build-tarball
+                    - linux-tarball
             - db-smoke-test:
                 filters:
                     branches:
@@ -1309,7 +1309,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-build-tarball
+                    - linux-tarball
             - rebar_lock_check:
                 filters:
                     branches:
@@ -1324,7 +1324,7 @@ workflows:
                     branches:
                         ignore:
                             - system-tests
-                name: linux-build-tarball
+                name: linux-tarball
                 package_name: aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - linux-tarball:
                 aeplugin_devmode: true
@@ -1334,7 +1334,7 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: linux-build-tarball-bundle
+                name: linux-tarball-bundle
                 package_name: aeternity-bundle-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - ubuntu_package:
                 filters:
@@ -1353,16 +1353,17 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: upload-build-tarballs-s3
+                name: upload-tarballs-s3
                 requires:
-                    - linux-build-tarball
-                    - linux-build-tarball-bundle
+                    - linux-tarball
+                    - linux-tarball-bundle
             - macos-tarball:
                 filters:
                     branches:
                         only:
                             - /releases\/.*/
                             - << pipeline.parameters.master_branch >>
+                name: macos-tarball
                 package_name: aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
                 requires: []
             - macos-tarball:
@@ -1398,7 +1399,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-build-tarball
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - docker-image:
                 context: ae-node-builds
@@ -1444,7 +1445,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-build-tarball
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1454,7 +1455,7 @@ workflows:
                         only: env/dev1
                 name: deploy-dev1
                 requires:
-                    - linux-build-tarball
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1464,7 +1465,7 @@ workflows:
                         only: env/dev2
                 name: deploy-dev2
                 requires:
-                    - linux-build-tarball
+                    - linux-tarball
                 version: $CIRCLE_SHA1
     release:
         jobs:
@@ -1496,6 +1497,7 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
+                name: macos-tarball
                 package_name: aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
             - macos-tarball:
                 aeplugin_devmode: true
