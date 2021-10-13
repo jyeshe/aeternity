@@ -12,7 +12,7 @@ tag_regex:
 
 master_branch:
   type: string
-  default: refactor_ci_config
+  default: master
 
 packages_workspace:
   type: string
