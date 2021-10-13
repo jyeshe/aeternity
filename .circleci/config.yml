@@ -1300,7 +1300,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-tarball
+                    - linux-build-tarball
             - db-smoke-test:
                 filters:
                     branches:
@@ -1309,7 +1309,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-tarball
+                    - linux-build-tarball
             - rebar_lock_check:
                 filters:
                     branches:
@@ -1324,6 +1324,7 @@ workflows:
                     branches:
                         ignore:
                             - system-tests
+                name: linux-build-tarball
                 package_name: aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - linux-tarball:
                 aeplugin_devmode: true
@@ -1333,7 +1334,7 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: linux-tarball-bundle
+                name: linux-build-tarball-bundle
                 package_name: aeternity-bundle-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - ubuntu_package:
                 filters:
@@ -1352,10 +1353,10 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: upload-tarballs-s3
+                name: upload-build-tarballs-s3
                 requires:
-                    - linux-tarball
-                    - linux-tarball-bundle
+                    - linux-build-tarball
+                    - linux-build-tarball-bundle
             - macos-tarball:
                 filters:
                     branches:
@@ -1397,7 +1398,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-tarball
+                    - linux-build-tarball
                 version: $CIRCLE_SHA1
             - docker-image:
                 context: ae-node-builds
@@ -1443,7 +1444,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-tarball
+                    - linux-build-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1453,7 +1454,7 @@ workflows:
                         only: env/dev1
                 name: deploy-dev1
                 requires:
-                    - linux-tarball
+                    - linux-build-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1463,7 +1464,7 @@ workflows:
                         only: env/dev2
                 name: deploy-dev2
                 requires:
-                    - linux-tarball
+                    - linux-build-tarball
                 version: $CIRCLE_SHA1
     release:
         jobs:
