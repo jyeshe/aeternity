@@ -16,7 +16,7 @@ commands:
                 command: |
                     make distclean
                     make prod-deb-package
-                    mkdir $(dirname << parameters.output>>)
+                    mkdir << parameters.output>>
                     mv _build/../../*aeternity-node_*.deb << parameters.output>>
                 environment:
                     DEB_SKIP_DH_AUTO_CLEAN: "true"
