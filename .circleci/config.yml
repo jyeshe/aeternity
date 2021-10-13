@@ -376,7 +376,7 @@ commands:
                 at: << pipeline.parameters.packages_workspace >>
             - run:
                 command: |
-                    BUCKET=dirname << parameters.uri >>
+                    BUCKET=$(dirname << parameters.uri >>)
                     DST=$(basename << parameters.uri >> | sed -e 's/\(aeternity\)-.*-\(.*\)-\(.*\).tar.gz/\1-latest-\2-\3.tar.gz/g')
                     envdir /secrets aws s3 cp --acl public-read << parameters.uri >> $BUCKET/$DST
                 name: Upload artifacts to s3

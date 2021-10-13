@@ -31,7 +31,7 @@ promote_latest_artifact_s3:
     - run:
         name: Upload artifacts to s3
         command: |
-          BUCKET=dirname << parameters.uri >>
+          BUCKET=$(dirname << parameters.uri >>)
           DST=$(basename << parameters.uri >> | sed -e 's/\(aeternity\)-.*-\(.*\)-\(.*\).tar.gz/\1-latest-\2-\3.tar.gz/g')
           envdir /secrets aws s3 cp --acl public-read << parameters.uri >> $BUCKET/$DST
 
