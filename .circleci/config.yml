@@ -1151,7 +1151,7 @@ parameters:
         default: macos-package-cache-v4
         type: string
     master_branch:
-        default: master
+        default: refactor_ci_config
         type: string
     packages_workspace:
         default: /tmp/packages
