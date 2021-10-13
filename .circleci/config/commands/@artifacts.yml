@@ -11,6 +11,8 @@ store_rebar3_crashdump:
 
 upload_artifact_s3:
   parameters:
+    version:
+      type: string
     bucket:
       type: string
     os:
@@ -25,25 +27,12 @@ upload_artifact_s3:
   steps:
     - attach_workspace:
         at: << pipeline.parameters.packages_workspace >>
-    - when:
-        condition: << pipeline.git.tag >>
-        steps:
-        - run:
-            name: Upload artifact to s3
-            command: |
-              envdir /secrets aws s3 cp --acl public-read \
-                << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.tag >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-                s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< pipeline.git.tag >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
-    - when:
-        condition:
-          not: << pipeline.git.tag >>
-        steps:
-        - run:
-            name: Upload artifact to s3
-            command: |
-              envdir /secrets aws s3 cp --acl public-read \
-                << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-                s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
+    - run:
+        name: Upload artifact to s3
+        command: |
+          envdir /secrets aws s3 cp --acl public-read \
+            << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
+            s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< parameters.version >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
 
 upload_artifacts_github:
   steps:

@@ -492,28 +492,17 @@ commands:
             suffix:
                 default: ""
                 type: string
+            version:
+                type: string
         steps:
             - attach_workspace:
                 at: << pipeline.parameters.packages_workspace >>
-            - when:
-                condition: << pipeline.git.tag >>
-                steps:
-                    - run:
-                        command: |
-                            envdir /secrets aws s3 cp --acl public-read \
-                              << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.tag >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-                              s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< pipeline.git.tag >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
-                        name: Upload artifact to s3
-            - when:
-                condition:
-                    not: << pipeline.git.tag >>
-                steps:
-                    - run:
-                        command: |
-                            envdir /secrets aws s3 cp --acl public-read \
-                              << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-                              s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
-                        name: Upload artifact to s3
+            - run:
+                command: |
+                    envdir /secrets aws s3 cp --acl public-read \
+                      << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
+                      s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< parameters.version >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
+                name: Upload artifact to s3
     upload_artifacts_apt:
         parameters:
             component:
@@ -1111,6 +1100,7 @@ jobs:
             - setup_secrets
             - upload_artifact_s3:
                 bucket: << pipeline.parameters.s3_builds_bucket >>
+                version: $CIRCLE_SHA1
             - when:
                 condition:
                     equal:
@@ -1119,7 +1109,7 @@ jobs:
                 steps:
                     - upload_artifact_s3:
                         bucket: << pipeline.parameters.s3_builds_bucket >>
-                        suffix: -latest
+                        version: latest
             - fail_notification
     upload-release-tarballs:
         executor: infrastructure_container_stable
@@ -1134,10 +1124,12 @@ jobs:
                 bucket: << pipeline.parameters.s3_releases_bucket >>
                 os: ubuntu
                 suffix: << parameters.suffix >>
+                version: $CIRCLE_TAG
             - upload_artifact_s3:
                 bucket: << pipeline.parameters.s3_releases_bucket >>
                 os: macos
                 suffix: << parameters.suffix >>
+                version: $CIRCLE_TAG
             - fail_notification
     upload-release-tarballs-github:
         executor: infrastructure_container_stable

@@ -5,13 +5,14 @@ upload-build-tarballs:
     - setup_secrets
     - upload_artifact_s3:
         bucket: << pipeline.parameters.s3_builds_bucket >>
+        version: $CIRCLE_SHA1
     - when:
         condition:
           equal: [ << pipeline.parameters.master_branch >>, << pipeline.git.branch >> ]
         steps:
           - upload_artifact_s3:
               bucket: << pipeline.parameters.s3_builds_bucket >>
-              suffix: -latest
+              version: latest
     - fail_notification
 
 upload-release-tarballs:
@@ -25,10 +26,12 @@ upload-release-tarballs:
     - setup_secrets
     - upload_artifact_s3:
         bucket: << pipeline.parameters.s3_releases_bucket >>
+        version: $CIRCLE_TAG
         suffix: << parameters.suffix >>
         os: ubuntu
     - upload_artifact_s3:
         bucket: << pipeline.parameters.s3_releases_bucket >>
+        version: $CIRCLE_TAG
         suffix: << parameters.suffix >>
         os: macos
     - fail_notification
