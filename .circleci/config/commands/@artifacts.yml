@@ -19,7 +19,7 @@ upload_artifacts_s3:
     - run:
         name: Upload artifacts to s3
         command: |
-          envdir /secrets aws s3 cp --acl public-read << pipeline.parameters.packages_workspace >> s3://<< parameters.bucket >>/
+          envdir /secrets aws s3 sync --acl public-read << pipeline.parameters.packages_workspace >> s3://<< parameters.bucket >>/
 
 upload_artifacts_github:
   steps:
