@@ -9,30 +9,17 @@ store_rebar3_crashdump:
     - store_artifacts:
         path: rebar3.crashdump
 
-upload_artifact_s3:
+upload_artifacts_s3:
   parameters:
-    version:
-      type: string
     bucket:
       type: string
-    os:
-      type: string
-      default: ubuntu
-    arch:
-      type: string
-      default: x86_64
-    suffix:
-      type: string
-      default: ""
   steps:
     - attach_workspace:
         at: << pipeline.parameters.packages_workspace >>
     - run:
-        name: Upload artifact to s3
+        name: Upload artifacts to s3
         command: |
-          envdir /secrets aws s3 cp --acl public-read \
-            << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-            s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< parameters.version >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
+          envdir /secrets aws s3 cp --acl public-read << pipeline.parameters.packages_workspace >> s3://<< parameters.bucket >>/
 
 upload_artifacts_github:
   steps:

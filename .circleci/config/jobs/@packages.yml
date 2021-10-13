@@ -1,11 +1,10 @@
-linux-package:
+linux-tarball:
   parameters:
     aeplugin_devmode:
       type: boolean
       default: false
-    package_name_suffix:
+    package_name:
       type: string
-      default: ""
   executor: builder_container_otp22
   steps:
     - fixed_checkout
@@ -14,9 +13,8 @@ linux-package:
         steps:
           - aeplugin_install_devmode
     - test_arch_os_dependencies
-    - build_package:
-        dir: << pipeline.parameters.packages_workspace >>
-        package_name: << parameters.package_name_suffix >><< pipeline.git.revision >>-ubuntu-x86_64
+    - build_tarball:
+        output: << pipeline.parameters.packages_workspace >>/<< parameters.package_name >>
     - store_artifacts:
         path: /tmp/package_tests/node1/log
     - store_artifacts:
@@ -36,8 +34,8 @@ ubuntu_package:
   working_directory: /home/builder/aeternity_deb
   steps:
     - fixed_checkout
-    - build_ubuntu_package:
-        dir: << pipeline.parameters.packages_workspace >>
+    - build_deb:
+        output: << pipeline.parameters.packages_workspace >>
     - store_package_artifacts
     - persist_to_workspace:
         root: << pipeline.parameters.packages_workspace >>
@@ -45,14 +43,13 @@ ubuntu_package:
           - "*.deb"
     - fail_notification
 
-osx_package:
+macos-tarball:
   parameters:
     aeplugin_devmode:
       type: boolean
       default: false
-    package_name_suffix:
+    package_name:
       type: string
-      default: ""
   macos:
     xcode: "11.1.0" # 11.1.0 is macOS 10.14.4
   working_directory: /Users/distiller/aeternity
@@ -78,9 +75,8 @@ osx_package:
           brew link cmake
     - save_macos_package_cache
     - test_arch_os_dependencies
-    - build_package:
-        dir: << pipeline.parameters.packages_workspace >>
-        package_name: << parameters.package_name_suffix >><< pipeline.git.revision >>-macos-x86_64
+    - build_tarball:
+        output: << pipeline.parameters.packages_workspace >>/<< parameters.package_name >>
     - store_artifacts:
         path: /tmp/package_tests/node1/log
     - store_artifacts:

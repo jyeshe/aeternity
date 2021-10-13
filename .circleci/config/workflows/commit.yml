@@ -141,7 +141,7 @@ jobs:
 
   - js-sdk-smoke-test:
       requires:
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           ignore:
@@ -151,7 +151,7 @@ jobs:
 
   - db-smoke-test:
       requires:
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           ignore:
@@ -169,15 +169,16 @@ jobs:
             - env/dev2
             - system-tests
 
-  - linux-package:
+  - linux-tarball:
+      package_name: aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
       filters:
         branches:
           ignore:
             - system-tests
 
-  - linux-package:
-      name: linux-package-bundle
-      package_name_suffix: bundle
+  - linux-tarball:
+      name: linux-tarball-bundle
+      package_name: aeternity-bundle-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
         branches:
@@ -194,11 +195,13 @@ jobs:
             - /releases\/.*/
             - << pipeline.parameters.master_branch >>
 
-  - upload-build-tarballs:
-      name: upload-build-tarballs
+  - upload-tarballs-s3:
+      name: upload-tarballs-s3
+      bucket: << pipeline.parameters.s3_builds_bucket >>
       context: ae-node-builds
       requires:
-        - linux-package
+        - linux-tarball
+        - linux-tarball-bundle
       filters:
         branches:
           ignore:
@@ -208,7 +211,8 @@ jobs:
             - env/dev2
             - system-tests
 
-  - osx_package:
+  - macos-tarball:
+      package_name: aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
       requires: []
       filters:
         branches:
@@ -216,9 +220,9 @@ jobs:
             - /releases\/.*/
             - << pipeline.parameters.master_branch >>
 
-  - osx_package:
-      name: osx_package_bundle
-      package_name_suffix: bundle
+  - macos-tarball:
+      name: macos-tarball-bundle
+      package_name: aeternity-bundle-$CIRCLE_SHA1-macos-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
         branches:
@@ -249,7 +253,7 @@ jobs:
         - aevm-test
         - static-analysis
         - rebar_lock_check
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           only: << pipeline.parameters.master_branch >>
@@ -298,7 +302,7 @@ jobs:
         - aevm-test
         - static-analysis
         - rebar_lock_check
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           only: << pipeline.parameters.master_branch >>
@@ -309,7 +313,7 @@ jobs:
       env: dev1
       context: ae-node-builds
       requires:
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           only: env/dev1
@@ -320,7 +324,7 @@ jobs:
       env: dev2
       context: ae-node-builds
       requires:
-        - linux-package
+        - linux-tarball
       filters:
         branches:
           only: env/dev2

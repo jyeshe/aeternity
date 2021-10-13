@@ -1,14 +1,15 @@
 jobs:
-  - linux-package:
+  - linux-tarball:
+      package_name: aeternity-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
       filters:
         branches:
           ignore: /.*/
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - linux-package:
-      name: linux-package-bundle
-      package_name_suffix: bundle
+  - linux-tarball:
+      name: linux-tarball-bundle
+      package_name: aeternity-bundle-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
         branches:
@@ -23,16 +24,17 @@ jobs:
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - osx_package:
+  - macos-tarball:
+      package_name: aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
       filters:
         branches:
           ignore: /.*/
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - osx_package:
-      name: osx_package_bundle
-      package_name_suffix: bundle
+  - macos-tarball:
+      name: macos-tarball-bundle
+      package_name: aeternity-bundle-$CIRCLE_TAG-macos-x86_64.tar.gz
       aeplugin_devmode: true
       filters:
         branches:
@@ -48,12 +50,14 @@ jobs:
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - upload-release-tarballs:
-      name: upload-release-tarballs
+  - upload-tarballs-s3:
+      bucket: << pipeline.parameters.s3_releases_bucket >>
       context: ae-node-builds
       requires:
-        - linux-package
-        - osx_package
+        - linux-tarball
+        - macos-tarball
+        - linux-tarball-bundle
+        - macos-tarball-bundle
         - hodl_artifact_upload
       filters:
         branches:
@@ -61,28 +65,13 @@ jobs:
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - upload-release-tarballs:
-      name: upload-release-tarballs-bundle
-      suffix: -bundle
+  - upload-tarballs-github-release:
       context: ae-node-builds
       requires:
-        - linux-package
-        - osx_package
-        - hodl_artifact_upload
-      filters:
-        branches:
-          ignore: /.*/
-        tags:
-          only: << pipeline.parameters.tag_regex >>
-
-  - upload-release-tarballs-github:
-      name: upload-release-tarballs-github
-      context: ae-node-builds
-      requires:
-        - linux-package
-        - linux-package-bundle
-        - osx_package
-        - osx_package_bundle
+        - linux-tarball
+        - macos-tarball
+        - linux-tarball-bundle
+        - macos-tarball-bundle
         - hodl_artifact_upload
       filters:
         branches:
@@ -106,7 +95,7 @@ jobs:
       downtime: 1800 #30m
       context: ae-node-builds
       requires:
-        - linux-package
+        - linux-tarball
         - hodl_blue
       filters:
         branches:
@@ -130,7 +119,7 @@ jobs:
       downtime: 1800 #30m
       context: ae-node-builds
       requires:
-        - linux-package
+        - linux-tarball
         - deploy-uat-blue
         - hodl_green
       filters:
@@ -147,24 +136,24 @@ jobs:
         tags:
           only: << pipeline.parameters.tag_regex >>
 
-  - upload-release-tarballs:
-      name: upload-latest-release-tarballs
-      suffix: -latest
-      context: ae-node-builds
-      requires:
-        - linux-package
-        - osx_package
-        - hodl_latest
-      filters:
-        branches:
-          ignore: /.*/
-        tags:
-          only: << pipeline.parameters.tag_regex >>
+  # - upload-release-tarballs:
+  #     name: upload-latest-release-tarballs
+  #     suffix: -latest
+  #     context: ae-node-builds
+  #     requires:
+  #       - linux-tarball
+  #       - macos-tarball
+  #       - hodl_latest
+  #     filters:
+  #       branches:
+  #         ignore: /.*/
+  #       tags:
+  #         only: << pipeline.parameters.tag_regex >>
 
   - publish-release-packages:
       requires:
-        - linux-package
-        - osx_package
+        - linux-tarball
+        - macos-tarball
         - hodl_latest
       filters:
         branches:
@@ -230,9 +219,10 @@ jobs:
       name: verify-release-artifacts
       context: ae-node-builds
       requires:
-        - upload-release-tarballs
-        - upload-latest-release-tarballs
-        - upload-release-tarballs-github
+        # - upload-release-tarballs
+        # - upload-latest-release-tarballs
+        - upload-tarballs-s3
+        - upload-tarballs-github-release
         - docker-image-tag
         - docker-image-latest
       filters:

@@ -7,11 +7,25 @@ commands:
                     curl -fsSLOJ https://github.com/aeternity/aeplugin_dev_mode/releases/download/v$PLUGIN_VERSION/aeplugin_dev_mode.tar.gz
                     tar -zxf aeplugin_dev_mode.tar.gz -C plugins/
                 name: Download devmode plugin
-    build_package:
+    build_deb:
         parameters:
-            dir:
+            output:
                 type: string
-            package_name:
+        steps:
+            - run:
+                command: |
+                    make distclean
+                    make prod-deb-package
+                    mkdir $(dirname << parameters.output>>)
+                    mv _build/../../*aeternity-node_*.deb << parameters.output>>
+                environment:
+                    DEB_SKIP_DH_AUTO_CLEAN: "true"
+                    ERLANG_ROCKSDB_BUILDOPTS: -j2
+                    ERLANG_ROCKSDB_OPTS: -DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON
+                name: Build Ubuntu package (*.deb)
+    build_tarball:
+        parameters:
+            output:
                 type: string
         steps:
             - run:
@@ -21,28 +35,11 @@ commands:
                     rm -rf _build/default/lib/mnesia_rocksdb
                     # Build the package
                     make prod-package
-                    mkdir << parameters.dir >>
-                    cp _build/prod/rel/aeternity/aeternity-$(cat VERSION).tar.gz << parameters.dir>>/aeternity-<< parameters.package_name >>.tar.gz
+                    mkdir $(dirname << parameters.output>>)
+                    cp _build/prod/rel/aeternity/aeternity-$(cat VERSION).tar.gz << parameters.output >>
                 environment:
                     ERLANG_ROCKSDB_OPTS: -DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON
                 name: Build Package Tarball
-    build_ubuntu_package:
-        parameters:
-            dir:
-                type: string
-        steps:
-            - run:
-                command: |
-                    make distclean
-                    make prod-deb-package
-                    mkdir << parameters.dir>>
-                    mv _build/../../*aeternity-node_*.deb << parameters.dir>>
-                environment:
-                    DEB_SKIP_DH_AUTO_CLEAN: "true"
-                    ERLANG_ROCKSDB_BUILDOPTS: -j2
-                    ERLANG_ROCKSDB_OPTS: -DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON
-                    PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
-                name: Build Ubuntu package (*.deb)
     common_tests:
         parameters:
             otp:
@@ -479,30 +476,6 @@ commands:
                 command: |
                     make test-arch-os-dependencies
                 name: Test architecture or OS specific functions
-    upload_artifact_s3:
-        parameters:
-            arch:
-                default: x86_64
-                type: string
-            bucket:
-                type: string
-            os:
-                default: ubuntu
-                type: string
-            suffix:
-                default: ""
-                type: string
-            version:
-                type: string
-        steps:
-            - attach_workspace:
-                at: << pipeline.parameters.packages_workspace >>
-            - run:
-                command: |
-                    envdir /secrets aws s3 cp --acl public-read \
-                      << pipeline.parameters.packages_workspace >>/aeternity-<< pipeline.git.revision >>-<< parameters.os >>-<< parameters.arch >>.tar.gz \
-                      s3://<< parameters.bucket >>/aeternity<< parameters.suffix >>-<< parameters.version >>-<< parameters.os >>-<< parameters.arch >>.tar.gz
-                name: Upload artifact to s3
     upload_artifacts_apt:
         parameters:
             component:
@@ -582,6 +555,17 @@ commands:
                       tag=${CIRCLE_TAG} \
                       ASSETS=<< pipeline.parameters.packages_workspace >>/*
                 name: Upload GitHub Release Asset
+    upload_artifacts_s3:
+        parameters:
+            bucket:
+                type: string
+        steps:
+            - attach_workspace:
+                at: << pipeline.parameters.packages_workspace >>
+            - run:
+                command: |
+                    envdir /secrets aws s3 cp --acl public-read << pipeline.parameters.packages_workspace >> s3://<< parameters.bucket >>/
+                name: Upload artifacts to s3
 executors:
     builder_container_1804:
         docker:
@@ -922,14 +906,13 @@ jobs:
                 command: ./node/bin/aeternity stop
                 name: Stop node
             - fail_notification
-    linux-package:
+    linux-tarball:
         executor: builder_container_otp22
         parameters:
             aeplugin_devmode:
                 default: false
                 type: boolean
-            package_name_suffix:
-                default: ""
+            package_name:
                 type: string
         steps:
             - fixed_checkout
@@ -938,9 +921,8 @@ jobs:
                 steps:
                     - aeplugin_install_devmode
             - test_arch_os_dependencies
-            - build_package:
-                dir: << pipeline.parameters.packages_workspace >>
-                package_name: << parameters.package_name_suffix >><< pipeline.git.revision >>-ubuntu-x86_64
+            - build_tarball:
+                output: << pipeline.parameters.packages_workspace >>/<< parameters.package_name >>
             - store_artifacts:
                 path: /tmp/package_tests/node1/log
             - store_artifacts:
@@ -954,15 +936,14 @@ jobs:
                     - '*.tar.gz'
                 root: << pipeline.parameters.packages_workspace >>
             - fail_notification
-    osx_package:
+    macos-tarball:
         macos:
             xcode: 11.1.0
         parameters:
             aeplugin_devmode:
                 default: false
                 type: boolean
-            package_name_suffix:
-                default: ""
+            package_name:
                 type: string
         steps:
             - fixed_checkout
@@ -985,9 +966,8 @@ jobs:
                 name: Install required tools
             - save_macos_package_cache
             - test_arch_os_dependencies
-            - build_package:
-                dir: << pipeline.parameters.packages_workspace >>
-                package_name: << parameters.package_name_suffix >><< pipeline.git.revision >>-macos-x86_64
+            - build_tarball:
+                output: << pipeline.parameters.packages_workspace >>/<< parameters.package_name >>
             - store_artifacts:
                 path: /tmp/package_tests/node1/log
             - store_artifacts:
@@ -1084,8 +1064,8 @@ jobs:
         executor: builder_container_1804
         steps:
             - fixed_checkout
-            - build_ubuntu_package:
-                dir: << pipeline.parameters.packages_workspace >>
+            - build_deb:
+                output: << pipeline.parameters.packages_workspace >>
             - store_package_artifacts
             - persist_to_workspace:
                 paths:
@@ -1093,45 +1073,7 @@ jobs:
                 root: << pipeline.parameters.packages_workspace >>
             - fail_notification
         working_directory: /home/builder/aeternity_deb
-    upload-build-tarballs:
-        executor: infrastructure_container_stable
-        steps:
-            - fixed_checkout
-            - setup_secrets
-            - upload_artifact_s3:
-                bucket: << pipeline.parameters.s3_builds_bucket >>
-                version: $CIRCLE_SHA1
-            - when:
-                condition:
-                    equal:
-                        - << pipeline.parameters.master_branch >>
-                        - << pipeline.git.branch >>
-                steps:
-                    - upload_artifact_s3:
-                        bucket: << pipeline.parameters.s3_builds_bucket >>
-                        version: latest
-            - fail_notification
-    upload-release-tarballs:
-        executor: infrastructure_container_stable
-        parameters:
-            suffix:
-                default: ""
-                type: string
-        steps:
-            - fixed_checkout
-            - setup_secrets
-            - upload_artifact_s3:
-                bucket: << pipeline.parameters.s3_releases_bucket >>
-                os: ubuntu
-                suffix: << parameters.suffix >>
-                version: $CIRCLE_TAG
-            - upload_artifact_s3:
-                bucket: << pipeline.parameters.s3_releases_bucket >>
-                os: macos
-                suffix: << parameters.suffix >>
-                version: $CIRCLE_TAG
-            - fail_notification
-    upload-release-tarballs-github:
+    upload-tarballs-github-release:
         executor: infrastructure_container_stable
         steps:
             - fixed_checkout
@@ -1147,6 +1089,17 @@ jobs:
                       tag=<< pipeline.git.tag >> \
                       ASSETS=<< pipeline.parameters.packages_workspace >>/*
                 name: Upload GitHub Release Asset
+            - fail_notification
+    upload-tarballs-s3:
+        executor: infrastructure_container_stable
+        parameters:
+            bucket:
+                type: string
+        steps:
+            - fixed_checkout
+            - setup_secrets
+            - upload_artifacts_s3:
+                bucket: << parameters.bucket >>
             - fail_notification
     verify-artifacts:
         executor: infrastructure_container_stable
@@ -1347,7 +1300,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-package
+                    - linux-tarball
             - db-smoke-test:
                 filters:
                     branches:
@@ -1356,7 +1309,7 @@ workflows:
                             - env/dev2
                             - system-tests
                 requires:
-                    - linux-package
+                    - linux-tarball
             - rebar_lock_check:
                 filters:
                     branches:
@@ -1366,12 +1319,13 @@ workflows:
                             - system-tests
                 requires:
                     - build-otp22
-            - linux-package:
+            - linux-tarball:
                 filters:
                     branches:
                         ignore:
                             - system-tests
-            - linux-package:
+                package_name: aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
+            - linux-tarball:
                 aeplugin_devmode: true
                 filters:
                     branches:
@@ -1379,8 +1333,8 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: linux-package-bundle
-                package_name_suffix: bundle
+                name: linux-tarball-bundle
+                package_name: aeternity-bundle-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - ubuntu_package:
                 filters:
                     branches:
@@ -1388,7 +1342,8 @@ workflows:
                             - /releases\/.*/
                             - << pipeline.parameters.master_branch >>
                 requires: []
-            - upload-build-tarballs:
+            - upload-tarballs-s3:
+                bucket: << pipeline.parameters.s3_builds_bucket >>
                 context: ae-node-builds
                 filters:
                     branches:
@@ -1397,25 +1352,27 @@ workflows:
                             - env/dev1
                             - env/dev2
                             - system-tests
-                name: upload-build-tarballs
+                name: upload-tarballs-s3
                 requires:
-                    - linux-package
-            - osx_package:
+                    - linux-tarball
+                    - linux-tarball-bundle
+            - macos-tarball:
                 filters:
                     branches:
                         only:
                             - /releases\/.*/
                             - << pipeline.parameters.master_branch >>
+                package_name: aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
                 requires: []
-            - osx_package:
+            - macos-tarball:
                 aeplugin_devmode: true
                 filters:
                     branches:
                         only:
                             - /releases\/.*/
                             - << pipeline.parameters.master_branch >>
-                name: osx_package_bundle
-                package_name_suffix: bundle
+                name: macos-tarball-bundle
+                package_name: aeternity-bundle-$CIRCLE_SHA1-macos-x86_64.tar.gz
             - publish-build-packages:
                 filters:
                     branches:
@@ -1440,7 +1397,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-package
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - docker-image:
                 context: ae-node-builds
@@ -1486,7 +1443,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                    - linux-package
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1496,7 +1453,7 @@ workflows:
                         only: env/dev1
                 name: deploy-dev1
                 requires:
-                    - linux-package
+                    - linux-tarball
                 version: $CIRCLE_SHA1
             - deploy:
                 context: ae-node-builds
@@ -1506,46 +1463,48 @@ workflows:
                         only: env/dev2
                 name: deploy-dev2
                 requires:
-                    - linux-package
+                    - linux-tarball
                 version: $CIRCLE_SHA1
     release:
         jobs:
-            - linux-package:
+            - linux-tarball:
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-            - linux-package:
+                package_name: aeternity-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
+            - linux-tarball:
                 aeplugin_devmode: true
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: linux-package-bundle
-                package_name_suffix: bundle
+                name: linux-tarball-bundle
+                package_name: aeternity-bundle-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
             - ubuntu_package:
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-            - osx_package:
+            - macos-tarball:
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-            - osx_package:
+                package_name: aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
+            - macos-tarball:
                 aeplugin_devmode: true
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: osx_package_bundle
-                package_name_suffix: bundle
+                name: macos-tarball-bundle
+                package_name: aeternity-bundle-$CIRCLE_TAG-macos-x86_64.tar.gz
             - hodl_artifact_upload:
                 filters:
                     branches:
@@ -1553,44 +1512,32 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 type: approval
-            - upload-release-tarballs:
+            - upload-tarballs-s3:
+                bucket: << pipeline.parameters.s3_releases_bucket >>
                 context: ae-node-builds
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: upload-release-tarballs
                 requires:
-                    - linux-package
-                    - osx_package
+                    - linux-tarball
+                    - macos-tarball
+                    - linux-tarball-bundle
+                    - macos-tarball-bundle
                     - hodl_artifact_upload
-            - upload-release-tarballs:
+            - upload-tarballs-github-release:
                 context: ae-node-builds
                 filters:
                     branches:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                name: upload-release-tarballs-bundle
                 requires:
-                    - linux-package
-                    - osx_package
-                    - hodl_artifact_upload
-                suffix: -bundle
-            - upload-release-tarballs-github:
-                context: ae-node-builds
-                filters:
-                    branches:
-                        ignore: /.*/
-                    tags:
-                        only: << pipeline.parameters.tag_regex >>
-                name: upload-release-tarballs-github
-                requires:
-                    - linux-package
-                    - linux-package-bundle
-                    - osx_package
-                    - osx_package_bundle
+                    - linux-tarball
+                    - macos-tarball
+                    - linux-tarball-bundle
+                    - macos-tarball-bundle
                     - hodl_artifact_upload
             - hodl_blue:
                 filters:
@@ -1611,7 +1558,7 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: deploy-uat-blue
                 requires:
-                    - linux-package
+                    - linux-tarball
                     - hodl_blue
                 version: $CIRCLE_TAG
             - hodl_green:
@@ -1633,7 +1580,7 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: deploy-uat-green
                 requires:
-                    - linux-package
+                    - linux-tarball
                     - deploy-uat-blue
                     - hodl_green
                 version: $CIRCLE_TAG
@@ -1644,19 +1591,6 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 type: approval
-            - upload-release-tarballs:
-                context: ae-node-builds
-                filters:
-                    branches:
-                        ignore: /.*/
-                    tags:
-                        only: << pipeline.parameters.tag_regex >>
-                name: upload-latest-release-tarballs
-                requires:
-                    - linux-package
-                    - osx_package
-                    - hodl_latest
-                suffix: -latest
             - publish-release-packages:
                 filters:
                     branches:
@@ -1664,8 +1598,8 @@ workflows:
                     tags:
                         only: << pipeline.parameters.tag_regex >>
                 requires:
-                    - linux-package
-                    - osx_package
+                    - linux-tarball
+                    - macos-tarball
                     - hodl_latest
             - docker-image:
                 context: ae-node-builds
@@ -1726,9 +1660,8 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: verify-release-artifacts
                 requires:
-                    - upload-release-tarballs
-                    - upload-latest-release-tarballs
-                    - upload-release-tarballs-github
+                    - upload-tarballs-s3
+                    - upload-tarballs-github-release
                     - docker-image-tag
                     - docker-image-latest
     system-tests:

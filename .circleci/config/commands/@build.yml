@@ -1,8 +1,6 @@
-build_package:
+build_tarball:
   parameters:
-    dir:
-      type: string
-    package_name:
+    output:
       type: string
   steps:
     - run:
@@ -15,18 +13,17 @@ build_package:
           rm -rf _build/default/lib/mnesia_rocksdb
           # Build the package
           make prod-package
-          mkdir << parameters.dir >>
-          cp _build/prod/rel/aeternity/aeternity-$(cat VERSION).tar.gz << parameters.dir>>/aeternity-<< parameters.package_name >>.tar.gz
+          mkdir $(dirname << parameters.output>>)
+          cp _build/prod/rel/aeternity/aeternity-$(cat VERSION).tar.gz << parameters.output >>
 
-build_ubuntu_package:
+build_deb:
   parameters:
-    dir:
+    output:
       type: string
   steps:
     - run:
         name: Build Ubuntu package (*.deb)
         environment:
-          PACKAGES_DIR: << pipeline.parameters.packages_workspace >>
           # The *clean commands are for work-around in CircleCI
           # Debian/Ubuntu package building (clean issues; fakeroot and
           # rebar3).
@@ -43,5 +40,5 @@ build_ubuntu_package:
         command: |
           make distclean
           make prod-deb-package
-          mkdir << parameters.dir>>
-          mv _build/../../*aeternity-node_*.deb << parameters.dir>>
+          mkdir $(dirname << parameters.output>>)
+          mv _build/../../*aeternity-node_*.deb << parameters.output>>

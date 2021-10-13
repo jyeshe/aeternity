@@ -1,42 +1,32 @@
-upload-build-tarballs:
-  executor: infrastructure_container_stable
-  steps:
-    - fixed_checkout
-    - setup_secrets
-    - upload_artifact_s3:
-        bucket: << pipeline.parameters.s3_builds_bucket >>
-        version: $CIRCLE_SHA1
-    - when:
-        condition:
-          equal: [ << pipeline.parameters.master_branch >>, << pipeline.git.branch >> ]
-        steps:
-          - upload_artifact_s3:
-              bucket: << pipeline.parameters.s3_builds_bucket >>
-              version: latest
-    - fail_notification
-
-upload-release-tarballs:
+upload-tarballs-s3:
   parameters:
-    suffix:
+    bucket:
       type: string
-      default: ""
   executor: infrastructure_container_stable
   steps:
     - fixed_checkout
     - setup_secrets
-    - upload_artifact_s3:
-        bucket: << pipeline.parameters.s3_releases_bucket >>
-        version: $CIRCLE_TAG
-        suffix: << parameters.suffix >>
-        os: ubuntu
-    - upload_artifact_s3:
-        bucket: << pipeline.parameters.s3_releases_bucket >>
-        version: $CIRCLE_TAG
-        suffix: << parameters.suffix >>
-        os: macos
+    - upload_artifacts_s3:
+        bucket: << parameters.bucket >>
+    # - when:
+    #     condition:
+    #       equal: [ << pipeline.parameters.master_branch >>, << pipeline.git.branch >> ]
+    #     steps:
+    #       - upload_artifact_s3:
+    #           bucket: << pipeline.parameters.s3_builds_bucket >>
+    #           version: latest
     - fail_notification
 
-upload-release-tarballs-github:
+# upload-release-tarballs:
+#   executor: infrastructure_container_stable
+#   steps:
+#     - fixed_checkout
+#     - setup_secrets
+#     - upload_artifacts_s3:
+#         bucket: << pipeline.parameters.s3_releases_bucket >>
+#     - fail_notification
+
+upload-tarballs-github-release:
   executor: infrastructure_container_stable
   steps:
     - fixed_checkout
