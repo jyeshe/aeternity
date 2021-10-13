@@ -179,7 +179,7 @@ jobs:
   - docker-image:
       name: docker-image-tag
       context: ae-node-builds
-      image_type: tag
+      tag: $CIRCLE_TAG
       requires:
         - hodl_artifact_upload
       filters:
@@ -192,8 +192,7 @@ jobs:
       name: docker-image-tag-bundle
       context: ae-node-builds
       aeplugin_devmode: true
-      image_type: tag
-      tag_suffix: -bundle
+      tag: $CIRCLE_TAG-bundle
       requires:
         - hodl_artifact_upload
       filters:
@@ -205,7 +204,7 @@ jobs:
   - docker-image:
       name: docker-image-latest
       context: ae-node-builds
-      image_type: latest
+      tag: latest
       requires:
         - docker-image-tag
         - hodl_latest
@@ -219,8 +218,7 @@ jobs:
       name: docker-image-latest-bundle
       context: ae-node-builds
       aeplugin_devmode: true
-      image_type: latest
-      tag_suffix: -bundle
+      tag: latest-bundle
       requires:
         - docker-image-tag
         - hodl_latest

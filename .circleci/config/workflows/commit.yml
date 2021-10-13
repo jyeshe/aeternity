@@ -275,7 +275,7 @@ jobs:
   - docker-image:
       name: docker-image-mainline
       context: ae-node-builds
-      image_type: branch
+      tag: $CIRCLE_BRANCH
       requires:
         - test
         - eunit
@@ -291,8 +291,7 @@ jobs:
       name: docker-image-mainline-bundle
       context: ae-node-builds
       aeplugin_devmode: true
-      image_type: branch
-      tag_suffix: -bundle
+      tag: $CIRCLE_BRANCH-bundle
       requires:
         - test
         - eunit

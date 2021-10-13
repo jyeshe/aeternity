@@ -4,12 +4,8 @@ docker-image:
     aeplugin_devmode:
       type: boolean
       default: false
-    image_type:
-      type: enum
-      enum: ["branch", "tag", "latest"]
-    tag_suffix:
+    tag:
       type: string
-      default: ""
   steps:
     - fixed_checkout
     - when:
@@ -19,21 +15,16 @@ docker-image:
     - setup_docker
     - when:
         condition:
-          equal: [ branch, << parameters.image_type >> ]
+          matches: { pattern: "^latest.*$", value: << parameters.tag >> }
         steps:
-          - docker_image:
-              tag: << pipeline.git.branch >><< parameters.tag_suffix>>
+        - docker_image:
+            tag: << parameters.tag >>
+            tag_only: true
     - when:
         condition:
-          equal: [ tag, << parameters.image_type >> ]
+          not: { matches: { pattern: "^latest.*$", value: << parameters.tag >> } }
         steps:
-          - docker_image:
-              tag: << pipeline.git.tag >><< parameters.tag_suffix>>
-    - when:
-        condition:
-          equal: [ latest, << parameters.image_type >> ]
-        steps:
-          - docker_image:
-              tag: latest<< parameters.tag_suffix>>
-              tag_only: true
+        - docker_image:
+            tag: << parameters.tag >>
+            tag_only: true
     - fail_notification

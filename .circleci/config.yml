@@ -795,14 +795,7 @@ jobs:
             aeplugin_devmode:
                 default: false
                 type: boolean
-            image_type:
-                enum:
-                    - branch
-                    - tag
-                    - latest
-                type: enum
-            tag_suffix:
-                default: ""
+            tag:
                 type: string
         steps:
             - fixed_checkout
@@ -813,28 +806,22 @@ jobs:
             - setup_docker
             - when:
                 condition:
-                    equal:
-                        - branch
-                        - << parameters.image_type >>
+                    matches:
+                        pattern: ^latest.*$
+                        value: << parameters.tag >>
                 steps:
                     - docker_image:
-                        tag: << pipeline.git.branch >><< parameters.tag_suffix>>
+                        tag: << parameters.tag >>
+                        tag_only: true
             - when:
                 condition:
-                    equal:
-                        - tag
-                        - << parameters.image_type >>
+                    not:
+                        matches:
+                            pattern: ^latest.*$
+                            value: << parameters.tag >>
                 steps:
                     - docker_image:
-                        tag: << pipeline.git.tag >><< parameters.tag_suffix>>
-            - when:
-                condition:
-                    equal:
-                        - latest
-                        - << parameters.image_type >>
-                steps:
-                    - docker_image:
-                        tag: latest<< parameters.tag_suffix>>
+                        tag: << parameters.tag >>
                         tag_only: true
             - fail_notification
     docker-js-sdk-smoke-test:
@@ -1441,7 +1428,6 @@ workflows:
                     branches:
                         only:
                             - << pipeline.parameters.master_branch >>
-                image_type: branch
                 name: docker-image-mainline
                 requires:
                     - test
@@ -1449,6 +1435,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
+                tag: $CIRCLE_BRANCH
             - docker-image:
                 aeplugin_devmode: true
                 context: ae-node-builds
@@ -1456,7 +1443,6 @@ workflows:
                     branches:
                         only:
                             - << pipeline.parameters.master_branch >>
-                image_type: branch
                 name: docker-image-mainline-bundle
                 requires:
                     - test
@@ -1464,7 +1450,7 @@ workflows:
                     - aevm-test
                     - static-analysis
                     - rebar_lock_check
-                tag_suffix: -bundle
+                tag: $CIRCLE_BRANCH-bundle
             - deploy:
                 context: ae-node-builds
                 downtime: 900
@@ -1671,10 +1657,10 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                image_type: tag
                 name: docker-image-tag
                 requires:
                     - hodl_artifact_upload
+                tag: $CIRCLE_TAG
             - docker-image:
                 aeplugin_devmode: true
                 context: ae-node-builds
@@ -1683,11 +1669,10 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                image_type: tag
                 name: docker-image-tag-bundle
                 requires:
                     - hodl_artifact_upload
-                tag_suffix: -bundle
+                tag: $CIRCLE_TAG-bundle
             - docker-image:
                 context: ae-node-builds
                 filters:
@@ -1695,11 +1680,11 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                image_type: latest
                 name: docker-image-latest
                 requires:
                     - docker-image-tag
                     - hodl_latest
+                tag: latest
             - docker-image:
                 aeplugin_devmode: true
                 context: ae-node-builds
@@ -1708,12 +1693,11 @@ workflows:
                         ignore: /.*/
                     tags:
                         only: << pipeline.parameters.tag_regex >>
-                image_type: latest
                 name: docker-image-latest-bundle
                 requires:
                     - docker-image-tag
                     - hodl_latest
-                tag_suffix: -bundle
+                tag: latest-bundle
             - verify-artifacts:
                 context: ae-node-builds
                 filters:
