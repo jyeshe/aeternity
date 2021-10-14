@@ -26,5 +26,5 @@ docker-image:
         steps:
         - docker_image:
             tag: << parameters.tag >>
-            tag_only: true
+            tag_only: false
     - fail_notification
