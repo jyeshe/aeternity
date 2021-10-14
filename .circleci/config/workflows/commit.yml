@@ -217,7 +217,7 @@ jobs:
       uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
       context: ae-node-builds
       requires:
-        - linux-tarball
+        - upload-tarballs-s3
       filters:
         branches:
           only:

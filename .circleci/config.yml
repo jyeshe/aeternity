@@ -1376,7 +1376,7 @@ workflows:
                             - << pipeline.parameters.master_branch >>
                 name: promote-tarball-s3
                 requires:
-                    - linux-tarball
+                    - upload-tarballs-s3
                 uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
             - macos-tarball:
                 filters:
@@ -1625,9 +1625,9 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: promote-release-linux-tarball-s3
                 requires:
-                    - linux-release-tarball
+                    - upload-release-tarballs-s3
                     - hodl_latest
-                uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-ubuntu-x86_64.tar.gz
+                uri: s3://<< pipeline.parameters.s3_releases_bucket >>/aeternity-$CIRCLE_TAG-ubuntu-x86_64.tar.gz
             - promote-tarball-s3:
                 context: ae-node-builds
                 filters:
@@ -1637,9 +1637,9 @@ workflows:
                         only: << pipeline.parameters.tag_regex >>
                 name: promote-release-macos-tarball-s3
                 requires:
-                    - macos-release-tarball
+                    - upload-release-tarballs-s3
                     - hodl_latest
-                uri: s3://<< pipeline.parameters.s3_builds_bucket >>/aeternity-$CIRCLE_SHA1-macos-x86_64.tar.gz
+                uri: s3://<< pipeline.parameters.s3_releases_bucket >>/aeternity-$CIRCLE_TAG-macos-x86_64.tar.gz
             - publish-release-packages:
                 filters:
                     branches:
