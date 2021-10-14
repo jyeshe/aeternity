@@ -276,12 +276,12 @@ jobs:
       name: docker-image-mainline
       context: ae-node-builds
       tag: $CIRCLE_BRANCH
-      requires:
-        - test
-        - eunit
-        - aevm-test
-        - static-analysis
-        - rebar_lock_check
+      # requires:
+      #   - test
+      #   - eunit
+      #   - aevm-test
+      #   - static-analysis
+      #   - rebar_lock_check
       filters:
         branches:
           only:
@@ -292,12 +292,12 @@ jobs:
       context: ae-node-builds
       aeplugin_devmode: true
       tag: $CIRCLE_BRANCH-bundle
-      requires:
-        - test
-        - eunit
-        - aevm-test
-        - static-analysis
-        - rebar_lock_check
+      # requires:
+      #   - test
+      #   - eunit
+      #   - aevm-test
+      #   - static-analysis
+      #   - rebar_lock_check
       filters:
         branches:
           only:

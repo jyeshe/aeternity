@@ -1138,7 +1138,7 @@ parameters:
         default: macos-package-cache-v4
         type: string
     master_branch:
-        default: master
+        default: refactor_ci_config
         type: string
     packages_workspace:
         default: /tmp/packages
@@ -1429,12 +1429,6 @@ workflows:
                         only:
                             - << pipeline.parameters.master_branch >>
                 name: docker-image-mainline
-                requires:
-                    - test
-                    - eunit
-                    - aevm-test
-                    - static-analysis
-                    - rebar_lock_check
                 tag: $CIRCLE_BRANCH
             - docker-image:
                 aeplugin_devmode: true
@@ -1444,12 +1438,6 @@ workflows:
                         only:
                             - << pipeline.parameters.master_branch >>
                 name: docker-image-mainline-bundle
-                requires:
-                    - test
-                    - eunit
-                    - aevm-test
-                    - static-analysis
-                    - rebar_lock_check
                 tag: $CIRCLE_BRANCH-bundle
             - deploy:
                 context: ae-node-builds
