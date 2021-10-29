@@ -193,6 +193,7 @@
         , fate_vm_cross_protocol_store_multi_small/1
         , bad_aens_pointer_handling_lima_to_iris/1
         , sophia_pattern_guards/1
+        , sophia_bitwise_operations/1
         ]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -249,14 +250,14 @@
         ?CERES_PROTOCOL_VSN   -> ?assertMatch(ExpMinerva, Res)
     end).
 
--define(assertMatchProtocol(Res, ExpR, ExpM, ExpF, ExpL, ExpI),
+-define(assertMatchProtocol(Res, ExpR, ExpM, ExpF, ExpL, ExpI, ExpC),
     case protocol_version() of
         ?ROMA_PROTOCOL_VSN    -> ?assertMatch(ExpR, Res);
         ?MINERVA_PROTOCOL_VSN -> ?assertMatch(ExpM, Res);
         ?FORTUNA_PROTOCOL_VSN -> ?assertMatch(ExpF, Res);
         ?LIMA_PROTOCOL_VSN    -> ?assertMatch(ExpL, Res);
         ?IRIS_PROTOCOL_VSN    -> ?assertMatch(ExpI, Res);
-        ?CERES_PROTOCOL_VSN   -> ?assertMatch(ExpI, Res) %% TBD
+        ?CERES_PROTOCOL_VSN   -> ?assertMatch(ExpC, Res)
     end).
 
 -define(assertMatchAEVM(__Exp, __Res),
@@ -467,6 +468,7 @@ groups() ->
                                  sophia_compiler_version,
                                  sophia_protected_call,
                                  sophia_pattern_guards,
+                                 sophia_bitwise_operations,
                                  bad_aens_pointer_handling_lima_to_iris,
                                  lima_migration
                                ]}
@@ -5628,7 +5630,7 @@ sophia_compiler_version(_Cfg) ->
     {code, Code} = aect_contracts:code(C),
     CMap = aeser_contract_code:deserialize(Code),
     ?assertMatchProtocol(maps:get(compiler_version, CMap, undefined),
-                         undefined, <<"2.1.0">>, <<"3.2.0">>, <<"unknown">>, <<"6.1.0">>),
+                         undefined, <<"2.1.0">>, <<"3.2.0">>, <<"unknown">>, <<"6.1.0">>, <<"7.0.0">>),
     ok.
 
 sophia_protected_call(_Cfg) ->
@@ -7584,5 +7586,13 @@ sophia_pattern_guards(_Cfg) ->
     state(aect_test_utils:new_state()),
     Acc = ?call(new_account, 100000000000 * aec_test_utils:min_gas_price()),
     C   = ?call(create_contract, Acc, pattern_guards, {}),
+    {}  = ?call(call_contract, Acc, C, test, {tuple, []}, {}),
+    ok.
+
+sophia_bitwise_operations(_Cfg) ->
+    ?skipRest(sophia_version() =< ?SOPHIA_IRIS_FATE, no_bitwise_operations_until_ceres),
+    state(aect_test_utils:new_state()),
+    Acc = ?call(new_account, 100000000000 * aec_test_utils:min_gas_price()),
+    C   = ?call(create_contract, Acc, bitwise_ops, {}),
     {}  = ?call(call_contract, Acc, C, test, {tuple, []}, {}),
     ok.
